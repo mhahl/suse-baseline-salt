@@ -1,5 +1,5 @@
 include:
-  - .systemd-resolved
-  - .chrony
-  - .banner
-  - .profile
+  - baseline.systemd-resolved.main
+  - baseline.chrony.main
+  - baseline.banner.main
+  - baseline.profile.main

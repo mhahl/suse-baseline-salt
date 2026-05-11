@@ -5,7 +5,7 @@ chrony_package:
 chrony_config:
   file.managed:
     - name: /etc/chrony.conf
-    - source: salt://baseline/templates/chrony/chrony.conf.jinja
+    - source: salt://baseline/chrony/templates/chrony.conf.jinja
     - template: jinja
     - user: root
     - group: root

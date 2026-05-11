@@ -7,7 +7,7 @@ systemd_resolved_package:
 resolved_config:
   file.managed:
     - name: /etc/systemd/resolved.conf
-    - source: salt://baseline/templates/systemd-resolved/resolved.conf.jinja
+    - source: salt://baseline/systemd-resolved/templates/resolved.conf.jinja
     - template: jinja
     - user: root
     - group: root
