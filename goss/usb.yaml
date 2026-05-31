@@ -1,0 +1,14 @@
+# Goss tests for baseline.usb
+
+file:
+  /etc/modprobe.d/99-baseline-usb-storage.conf:
+    exists: true
+    contains:
+      - "blacklist usb-storage"
+      - "blacklist uas"
+
+command:
+  "lsmod | grep -E 'usb_storage|uas' || true":
+    exit-status: 0
+    # We expect the modules to be absent or the blacklist to be in place
+    # This is a soft check

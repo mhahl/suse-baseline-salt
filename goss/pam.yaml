@@ -1,0 +1,22 @@
+# Goss tests for baseline.pam (faillock + pwquality)
+
+package:
+  pam:
+    installed: true
+
+file:
+  /etc/security/faillock.conf:
+    exists: true
+    mode: "0644"
+    contains:
+      - "deny ="
+      - "unlock_time ="
+      - "even_deny_root"
+
+  /etc/security/pwquality.conf:
+    exists: true
+    mode: "0644"
+    contains:
+      - "minlen ="
+      - "minclass ="
+      - "enforce_for_root"

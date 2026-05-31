@@ -1,0 +1,35 @@
+# =============================================================================
+# SUSE Baseline - Hardened Sudo Configuration
+# Requires TTY, logs everything, restricts dangerous options.
+# =============================================================================
+
+Defaults    !visiblepw
+Defaults    always_set_home
+Defaults    match_group_by_gid
+Defaults    always_query_group_plugin
+Defaults    env_reset
+Defaults    secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Defaults    env_delete="PYTHONPATH PYTHONHOME PYTHONEXECUTABLE PYTHONUSERBASE"
+
+# Require TTY for sudo (prevents some attacks via cron/SSH)
+Defaults    requiretty
+
+# Log everything
+Defaults    logfile="/var/log/sudo.log"
+Defaults    log_input
+Defaults    log_output
+
+# Insults (optional fun deterrent)
+Defaults    insults
+
+# Only allow wheel group (or defined in pillar) to use sudo by default
+# Individual users or groups can be added via pillar or separate files.
+
+# Example: allow specific users from pillar
+{% for user in pillar.get('baseline:sudo:allowed_users', []) %}
+{{ user }} ALL=(ALL) ALL
+{% endfor %}
+
+{% for group in pillar.get('baseline:sudo:allowed_groups', ['wheel']) %}
+%{{ group }} ALL=(ALL) ALL
+{% endfor %}

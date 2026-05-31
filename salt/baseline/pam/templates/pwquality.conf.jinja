@@ -1,0 +1,10 @@
+# =============================================================================
+# SUSE Baseline - Password Quality
+# =============================================================================
+minlen = {{ pillar.get('baseline:pam:pw_minlen', 15) }}
+minclass = {{ pillar.get('baseline:pam:pw_minclass', 4) }}
+maxrepeat = 3
+maxsequence = 4
+dictcheck = 1
+usercheck = 1
+enforce_for_root

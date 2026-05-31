@@ -1,0 +1,19 @@
+# Goss tests for baseline.chrony
+
+package:
+  chrony:
+    installed: true
+
+service:
+  chronyd:
+    enabled: true
+    running: true
+
+file:
+  /etc/chrony.conf:
+    exists: true
+    mode: "0644"
+    contains:
+      - "server time1.google.com"
+      - "rtcsync"
+      - "minsources 3"

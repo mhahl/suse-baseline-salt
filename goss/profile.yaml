@@ -1,0 +1,25 @@
+# Goss tests for baseline.profile
+
+file:
+  /etc/profile.d/99-baseline.sh:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contains:
+      - "HISTTIMEFORMAT"
+      - "PROMPT_COMMAND"
+      - "TMOUT"
+      - "umask 027"
+      - "ulimit -S -c 0"
+
+command:
+  "grep -E 'readonly (HIST|PROMPT_COMMAND|TMOUT)' /etc/profile.d/99-baseline.sh | wc -l":
+    exit-status: 0
+    stdout:
+      - "/^6$/"   # At least several readonly variables
+
+  "bash -c 'source /etc/profile.d/99-baseline.sh; echo $HISTSIZE'":
+    exit-status: 0
+    stdout:
+      - "100000"

@@ -1,0 +1,11 @@
+# Goss tests for baseline.updates
+
+file:
+  /etc/zypp/zypp.conf:
+    exists: true
+    contains:
+      - "solver.onlyRequires = true"
+
+command:
+  "test -f /var/log/baseline-last-update":
+    exit-status: 0

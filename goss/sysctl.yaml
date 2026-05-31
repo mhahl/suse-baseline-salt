@@ -1,0 +1,30 @@
+# Goss tests for baseline.sysctl
+
+kernel:
+  param:
+    net.ipv4.conf.all.rp_filter:
+      value: "1"
+    net.ipv4.conf.default.rp_filter:
+      value: "1"
+    net.ipv4.tcp_syncookies:
+      value: "1"
+    net.ipv4.ip_forward:
+      value: "0"
+    kernel.dmesg_restrict:
+      value: "1"
+    kernel.kptr_restrict:
+      value: "2"
+    fs.protected_hardlinks:
+      value: "1"
+    fs.protected_symlinks:
+      value: "1"
+
+file:
+  /etc/sysctl.d/99-baseline-hardening.conf:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contains:
+      - "SUSE Baseline - Kernel & Network Hardening"
+      - "net.ipv4.conf.all.rp_filter"

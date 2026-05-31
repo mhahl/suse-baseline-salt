@@ -19,6 +19,5 @@ chrony_service:
   service.running:
     - name: chronyd
     - enable: True
-    - restart: True
     - watch:
       - file: chrony_config

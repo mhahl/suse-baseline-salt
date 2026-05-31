@@ -1,0 +1,22 @@
+# Main goss file for full baseline testing
+# Usage: goss --gossfile goss/goss.yaml validate
+
+gossfile:
+  # Core modules
+  profile.yaml: {}
+  systemd-resolved.yaml: {}
+  chrony.yaml: {}
+  banner.yaml: {}
+
+  # Additional hardening modules
+  sysctl.yaml: {}
+  coredump.yaml: {}
+  audit.yaml: {}
+  sudo.yaml: {}
+  pam.yaml: {}
+  firewalld.yaml: {}
+  fapolicyd.yaml: {}
+  usb.yaml: {}
+  grub.yaml: {}
+  integrity.yaml: {}
+  updates.yaml: {}

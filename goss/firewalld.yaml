@@ -1,0 +1,22 @@
+# Goss tests for baseline.firewalld
+
+package:
+  firewalld:
+    installed: true
+
+service:
+  firewalld:
+    enabled: true
+    running: true
+
+command:
+  "firewall-cmd --get-default-zone":
+    exit-status: 0
+    stdout:
+      - "drop"
+
+  "firewall-cmd --list-services":
+    exit-status: 0
+    # At minimum ssh should be allowed in most test scenarios
+    stdout:
+      - "ssh"

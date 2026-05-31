@@ -1,4 +1,4 @@
-# /srv/salt/baseline/banner.sls
+# MOTD banner (late-loading via 99- prefix)
 motd_banner:
   file.managed:
     - name: /etc/motd.d/99-steggy

@@ -2,7 +2,7 @@
 {% set iburst = ntp.get('iburst', True) %}
 
 {% for server in servers %}
-server {{ server }} {{ 'iburst' if iburst else '' }}
+server {{ server }}{% if iburst %} iburst{% endif %}
 {% endfor %}
 
 # Standard chrony settings

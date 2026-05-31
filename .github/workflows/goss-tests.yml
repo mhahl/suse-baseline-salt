@@ -1,0 +1,119 @@
+name: Goss Tests (Server Spec)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - profile
+          - systemd-resolved
+          - chrony
+          - banner
+          - sysctl
+          - coredump
+          - audit
+          - sudo
+          - pam
+          - firewalld
+          # - fapolicyd     # Disabled by default in pillar
+          - usb
+          - grub
+          - integrity
+          - updates
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run Goss tests in openSUSE Tumbleweed container
+        run: |
+          docker run --rm --privileged \
+            -v ${{ github.workspace }}:/workspace \
+            opensuse/tumbleweed:latest \
+            /bin/bash -euo pipefail -c '
+              echo "=== Setting up Tumbleweed container for component: ${{ matrix.component }} ==="
+
+              # Install dependencies
+              zypper --non-interactive refresh
+              zypper --non-interactive install --no-recommends \
+                salt-minion \
+                curl \
+                ca-certificates \
+                systemd \
+                procps \
+                iproute2 \
+                firewalld
+
+              # Install Goss
+              echo "Installing Goss..."
+              curl -fsSL https://goss.rocks/install.sh | sh
+              goss --version
+
+              # Prepare Salt environment
+              echo "Preparing Salt local environment..."
+              mkdir -p /srv/salt /srv/pillar /etc/salt
+
+              # Copy Salt states
+              cp -r /workspace/salt/* /srv/salt/
+
+              # Create minimal top.sls for this component
+              cat > /srv/salt/top.sls << EOF
+          base:
+            "*":
+              - baseline.${{ matrix.component }}.main
+          EOF
+
+              # Copy pillar
+              cp /workspace/pillar/baseline.sls /srv/pillar/baseline.sls
+
+              # Create pillar top
+              cat > /srv/pillar/top.sls << EOF
+          base:
+            "*":
+              - baseline
+          EOF
+
+              # Minimal minion config for local mode
+              cat > /etc/salt/minion << EOF
+          file_roots:
+            base:
+              - /srv/salt
+          pillar_roots:
+            base:
+              - /srv/pillar
+          EOF
+
+              # Apply the Salt state for this component
+              echo "Applying Salt state: baseline.${{ matrix.component }}.main"
+              salt-call --local --retcode-passthrough state.apply baseline.${{ matrix.component }}.main --log-level=warning || {
+                echo "Salt apply failed for ${{ matrix.component }}"
+                exit 1
+              }
+
+              echo "=== Salt state applied successfully ==="
+
+              # Run Goss test
+              GOSSFILE="/workspace/goss/${{ matrix.component }}.yaml"
+              if [ -f "$GOSSFILE" ]; then
+                echo "Running Goss tests from $GOSSFILE"
+                goss --gossfile "$GOSSFILE" validate
+              else
+                echo "No goss file found for ${{ matrix.component }} at $GOSSFILE - skipping"
+              fi
+
+              echo "=== Goss tests completed for ${{ matrix.component }} ==="
+            '
+        shell: bash
+        env:
+          COMPONENT: ${{ matrix.component }}

@@ -1,0 +1,84 @@
+# =============================================================================
+# SUSE Baseline - Kernel & Network Hardening
+# Managed by Salt. Do not edit directly.
+# Based on official SUSE Security and Hardening Guide + modern best practices
+# for openSUSE Tumbleweed (2026).
+# =============================================================================
+
+{% set sysctl = pillar.get('baseline:sysctl', {}) %}
+
+# -----------------------------------------------------------------------------
+# IPv4 Reverse Path Filtering (strict mode)
+# Prevents IP spoofing / DDoS reflection
+# -----------------------------------------------------------------------------
+net.ipv4.conf.default.rp_filter = {{ sysctl.get('rp_filter', 1) }}
+net.ipv4.conf.all.rp_filter = {{ sysctl.get('rp_filter', 1) }}
+
+# -----------------------------------------------------------------------------
+# Disable source routing (IPv4 + IPv6)
+# -----------------------------------------------------------------------------
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.default.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+
+# -----------------------------------------------------------------------------
+# TCP SYN Cookies + Backlog (SYN flood protection)
+# -----------------------------------------------------------------------------
+net.ipv4.tcp_syncookies = {{ sysctl.get('tcp_syncookies', 1) }}
+net.ipv4.tcp_max_syn_backlog = {{ sysctl.get('tcp_max_syn_backlog', 4096) }}
+
+# -----------------------------------------------------------------------------
+# ICMP hardening
+# -----------------------------------------------------------------------------
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+# -----------------------------------------------------------------------------
+# Disable ICMP redirects (MITM protection)
+# -----------------------------------------------------------------------------
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+
+net.ipv6.conf.default.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+
+# -----------------------------------------------------------------------------
+# IP forwarding (only enable if this is a router)
+# -----------------------------------------------------------------------------
+net.ipv4.ip_forward = {{ sysctl.get('ip_forward', 0) }}
+net.ipv6.conf.all.forwarding = {{ sysctl.get('ip_forward', 0) }}
+net.ipv6.conf.default.forwarding = {{ sysctl.get('ip_forward', 0) }}
+
+# -----------------------------------------------------------------------------
+# Log martian packets (useful for detection)
+# -----------------------------------------------------------------------------
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.default.log_martians = 1
+
+# -----------------------------------------------------------------------------
+# Kernel hardening (modern defaults for Tumbleweed)
+# -----------------------------------------------------------------------------
+kernel.dmesg_restrict = {{ sysctl.get('dmesg_restrict', 1) }}
+kernel.kptr_restrict = {{ sysctl.get('kptr_restrict', 2) }}
+kernel.yama.ptrace_scope = {{ sysctl.get('ptrace_scope', 2) }}
+kernel.unprivileged_userns_clone = {{ sysctl.get('unprivileged_userns_clone', 0) }}
+
+# -----------------------------------------------------------------------------
+# Filesystem hardening
+# -----------------------------------------------------------------------------
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
+fs.protected_fifos = 2
+fs.protected_regular = 2
+
+# -----------------------------------------------------------------------------
+# Additional useful hardening
+# -----------------------------------------------------------------------------
+kernel.core_uses_pid = 1
+fs.suid_dumpable = 0
+kernel.randomize_va_space = 2

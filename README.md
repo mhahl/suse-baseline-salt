@@ -1,5 +1,155 @@
-# SUSE Baseline
+# SUSE Baseline (suse-baseline-salt)
 
-Deploy Sigaint baseline using salt for SUSE
+SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed** (and modern SUSE).
+
+## What it does
+
+**Core modules** (original narrow forensic/privacy focus):
+
+- **systemd-resolved** — Strict DNS-over-TLS + DNSSEC, no fallback, no MulticastDNS/LLMNR
+- **chrony** — Hardened NTP
+- **banner** + **profile** — Forensic bash history, session security, umask, etc.
+
+**Additional hardening modules** (added for broader baseline):
+
+- **sysctl** — Kernel & network hardening (official SUSE recommendations + modern defaults)
+- **coredump** — Systemd-coredump limits + storage control
+- **audit** — Forensic auditd rules (file watches, privilege escalation, etc.)
+- **sudo** — Require TTY, full logging, restricted paths
+- **pam** — faillock (lockout), pwquality, strong password policies
+- **firewalld** — Default-deny with explicit allow list from pillar
+- **fapolicyd** — Execution control / allowlisting (disabled by default)
+- **usb** — Block USB storage devices
+- **grub** — Bootloader password + hardened GRUB settings
+- **integrity** — rpm -Va checks (+ optional AIDE)
+- **updates** — Zypper policy for Tumbleweed (auto-dup is off by default)
+
+## Quick start
+
+```bash
+# Target a minion (or use your normal targeting)
+salt '*' state.apply baseline
+```
+
+Or via top file / highstate if you already include `baseline` in your pillar top.
+
+## Pillar configuration
+
+See [pillar/baseline.sls](pillar/baseline.sls). Example:
+
+```yaml
+baseline:
+  systemd_resolved:
+    dns: "76.76.2.22#xldfopbe6w.dns.controld.com"   # Control D DoT endpoint
+  ntp:
+    servers:
+      - time1.google.com
+      - time2.google.com
+    iburst: true
+```
+
+Override in your own pillar as needed.
+
+## Important notes / warnings
+
+- The resolved module **forcefully manages** `/etc/resolv.conf` (symlink takeover). This is intentional for the privacy goals but will conflict with NetworkManager or other resolvers if they are also active.
+- History settings and `PROMPT_COMMAND` changes are aggressive for incident-response purposes. Test in a safe environment first.
+- `TMOUT`, fancy prompts, and some hardening only apply to interactive shells.
+- **USB storage is blocked by default** in this baseline.
+- **Firewalld is placed in drop mode** — only explicitly allowed services/ports will work.
+- **No SSH hardening module** is included (managed by FreeIPA in the target environment).
+- **No AppArmor states** (Tumbleweed uses SELinux in the target deployment).
+- Several modules (grub password, fapolicyd, AIDE, automatic updates) are conservative or disabled by default — review pillar before enabling.
+
+## Verification (after apply)
+
+```bash
+# DNS + NTP (original)
+resolvectl status
+chronyc sources
+
+# New hardening
+sysctl -a | grep -E 'rp_filter|dmesg_restrict|ptrace_scope'
+cat /etc/systemd/coredump.conf.d/99-baseline.conf
+auditctl -l | head
+sudo -l
+cat /etc/security/faillock.conf
+firewall-cmd --list-all
+lsmod | grep -E 'usb_storage|uas' || echo "USB storage blocked (good)"
+ls /etc/sudoers.d/99-baseline
+cat /var/log/baseline-last-update
+
+# MOTD (on new login)
+cat /etc/motd.d/99-steggy
+```
+
+## Requirements
+
+- Salt minion on openSUSE Tumbleweed (or recent Leap/SLES where the states are known to work)
+- `systemd-resolved` and `chrony` packages available
+
+## Layout
+
+```
+salt/baseline/
+├── init.sls
+├── systemd-resolved/
+├── chrony/
+├── profile/
+├── banner/
+├── sysctl/
+├── coredump/
+├── audit/
+├── sudo/
+├── pam/
+├── firewalld/
+├── fapolicyd/
+├── usb/
+├── grub/
+├── integrity/
+└── updates/
+pillar/
+└── baseline.sls
+```
+
+## Testing with Goss (Server Spec)
+
+This repository uses [goss](https://goss.rocks/) to validate that each Salt component produces the expected system state.
+
+### GitHub Actions
+
+On every push and pull request, a matrix workflow runs in GitHub Actions:
+
+- Spins up a fresh `opensuse/tumbleweed` container
+- Applies the specific component via `salt-call --local`
+- Runs the corresponding Goss test file from `goss/<component>.yaml`
+
+See [.github/workflows/goss-tests.yml](.github/workflows/goss-tests.yml).
+
+### Running locally
+
+```bash
+# Test a single component
+./tests/run-goss-component.sh sysctl
+./tests/run-goss-component.sh profile
+./tests/run-goss-component.sh firewalld
+
+# Or run full suite manually (requires Docker + Tumbleweed image)
+```
+
+You can also run goss directly against a live system after applying states:
+
+```bash
+goss --gossfile goss/sysctl.yaml validate
+```
+
+### Adding new tests
+
+1. Create `goss/<component>.yaml`
+2. Add the component to the matrix in `.github/workflows/goss-tests.yml`
+3. Add it to `goss/goss.yaml` (for full baseline runs)
+4. Update `tests/run-goss-component.sh` help text if needed
+
+Contributions and feedback welcome. This started as a personal hardening collection and is intentionally small.
 
 

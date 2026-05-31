@@ -1,0 +1,10 @@
+# Goss tests for baseline.banner
+
+file:
+  /etc/motd.d/99-steggy:
+    exists: true
+    mode: "0644"
+    owner: root
+    contains:
+      - "It's a UNIX System!"
+      - "I know this!"

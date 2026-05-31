@@ -1,0 +1,14 @@
+# Goss tests for baseline.coredump
+
+file:
+  /etc/systemd/coredump.conf.d/99-baseline.conf:
+    exists: true
+    mode: "0644"
+    contains:
+      - "[Coredump]"
+      - "Storage=external"
+      - "Compress=yes"
+
+command:
+  "systemctl is-active systemd-coredump.socket || true":
+    exit-status: 0

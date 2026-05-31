@@ -1,0 +1,12 @@
+# Basic AIDE configuration for SUSE baseline
+database_in=file:/var/lib/aide/aide.db
+database_out=file:/var/lib/aide/aide.db.new
+gzip_dbout=yes
+
+# Standard rules
+/etc p+i+u+g+sha512
+/bin p+i+u+g+sha512
+/sbin p+i+u+g+sha512
+/usr/bin p+i+u+g+sha512
+/usr/sbin p+i+u+g+sha512
+/var/log p+i+u+g+sha512

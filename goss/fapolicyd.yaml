@@ -1,0 +1,11 @@
+# Goss tests for baseline.fapolicyd (often disabled by default)
+
+package:
+  fapolicyd:
+    installed: false   # Change to true if you enable the module
+
+# When enabled:
+# service:
+#   fapolicyd:
+#     enabled: true
+#     running: true

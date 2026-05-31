@@ -1,0 +1,10 @@
+# Goss tests for baseline.grub
+# Note: Full GRUB password testing requires a real bootloader environment.
+# These are the parts we can reasonably assert.
+
+file:
+  /etc/default/grub:
+    exists: true
+    contains:
+      - "GRUB_DISABLE_RECOVERY=true"
+      - "GRUB_DISABLE_OS_PROBER=true"

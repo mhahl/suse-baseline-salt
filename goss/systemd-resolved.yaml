@@ -1,0 +1,24 @@
+# Goss tests for baseline.systemd-resolved
+
+package:
+  systemd-resolved:
+    installed: true
+
+service:
+  systemd-resolved:
+    enabled: true
+    running: true
+
+file:
+  /etc/systemd/resolved.conf:
+    exists: true
+    mode: "0644"
+    contains:
+      - "DNSOverTLS=yes"
+      - "DNSSEC=yes"
+      - "FallbackDNS="
+
+  /etc/resolv.conf:
+    exists: true
+    filetype: symlink
+    linked-to: /run/systemd/resolve/stub-resolv.conf
