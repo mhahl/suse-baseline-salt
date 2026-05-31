@@ -35,6 +35,13 @@ docker run --rm --privileged --user root \
     echo ">>> SETTING UP CONTAINER FOR: ${COMPONENT}"
     echo "================================================================================"
 
+    # Ensure we are running as root (required for zypper, mkdir in /, etc.)
+    if [ "$(id -u)" -ne 0 ]; then
+      echo "ERROR: Docker container is not running as root (current uid: $(id -u))."
+      echo "This usually means --user root was not passed to docker run."
+      exit 1
+    fi
+
     zypper --non-interactive refresh >/dev/null 2>&1 || true
 
     # Base packages needed by most components
