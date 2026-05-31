@@ -22,6 +22,9 @@ help:
 	@echo "  make install-goss    - Download goss binary to current directory"
 	@echo "  make clean           - Remove downloaded goss binary"
 	@echo ""
+	@echo "First time setup on a SUSE VM:"
+	@echo "  sudo ./scripts/setup-test-vm.sh"
+	@echo ""
 
 lint:
 	yamllint .

@@ -130,6 +130,21 @@ See [.github/workflows/yamllint.yml](.github/workflows/yamllint.yml).
 
 Tests are intended to be run manually on a SUSE VM (Tumbleweed or Leap) after applying the Salt states.
 
+#### Quick VM Setup
+
+Run the following script on a fresh SUSE VM to install Salt, Goss, and prepare the environment:
+
+```bash
+sudo ./scripts/setup-test-vm.sh
+```
+
+This will:
+- Install `salt-minion`, `make`, `goss`, and common packages used by the baseline
+- Set up symlinks under `/srv/salt` and `/srv/pillar`
+- Print the next commands to apply states and run tests
+
+#### Running Tests
+
 ```bash
 # Install goss (if not already present)
 make install-goss
