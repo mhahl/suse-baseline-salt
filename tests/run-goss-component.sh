@@ -24,7 +24,7 @@ echo "==> Testing component: $COMPONENT"
 docker run --rm --privileged \
   -v "$REPO_ROOT:/workspace" \
   opensuse/tumbleweed:latest \
-  /bin/bash -euo pipefail -c '
+  /bin/bash -x -euo pipefail -c '
     COMPONENT="'"$COMPONENT"'"
     echo "=== Setting up for $COMPONENT ==="
 

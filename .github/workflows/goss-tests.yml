@@ -57,7 +57,8 @@ jobs:
 
               # Install Goss
               echo "Installing Goss..."
-              curl -fsSL https://goss.rocks/install.sh | sh
+              curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /usr/local/bin/goss
+              chmod +rx /usr/local/bin/goss
               goss --version
 
               # Prepare Salt environment
