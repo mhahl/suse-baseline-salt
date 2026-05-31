@@ -1,19 +1,12 @@
-# Baseline hardening state (includes all sub-modules)
+# Baseline hardening state
+#
+# This is the main entry point. It aggregates the different categories
+# of baseline configuration for better modularity.
 include:
-  - baseline.systemd-resolved.main
-  - baseline.chrony.main
-  - baseline.banner.main
-  - baseline.profile.main
+  - baseline.system.init
+  - baseline.hardening.init
+  - baseline.network.init
 
-  # Additional hardening (added 2026)
-  - baseline.sysctl.main
-  - baseline.coredump.main
-  - baseline.audit.main
-  - baseline.sudo.main
-  - baseline.pam.main
-  - baseline.firewalld.main
-  - baseline.fapolicyd.main
-  - baseline.usb.main
-  - baseline.grub.main
-  - baseline.integrity.main
-  - baseline.updates.main
+  # Monitoring is kept separate (see salt/monitoring/)
+  # - monitoring.init
+

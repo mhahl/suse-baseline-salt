@@ -1,0 +1,20 @@
+# Goss tests for monitoring.node_exporter
+
+package:
+  prometheus-node_exporter:
+    installed: true
+
+file:
+  /etc/sysconfig/prometheus-node_exporter:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contains:
+      - "prometheus-node_exporter"
+
+service:
+  prometheus-node_exporter:
+    enabled: true
+    # In Goss container tests we intentionally do not start services
+    running: false

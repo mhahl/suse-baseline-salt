@@ -1,0 +1,36 @@
+# Goss tests for monitoring.vmagent
+
+user:
+  vmagent:
+    exists: true
+    home: /var/lib/vmagent
+
+file:
+  /usr/local/bin/vmagent:
+    exists: true
+    mode: "0755"
+    owner: root
+    group: root
+
+  /etc/vmagent/scrape.yml:
+    exists: true
+    mode: "0644"
+    owner: vmagent
+    group: vmagent
+    contains:
+      - "job_name:"
+
+  /etc/systemd/system/vmagent.service:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contains:
+      - "vmagent"
+      - "remoteWrite.url"
+
+service:
+  vmagent:
+    enabled: true
+    # In Goss container tests we intentionally do not start services
+    running: false

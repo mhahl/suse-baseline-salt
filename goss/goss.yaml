@@ -20,3 +20,8 @@ gossfile:
   grub.yaml: {}
   integrity.yaml: {}
   updates.yaml: {}
+
+  # Monitoring modules
+  falco.yaml: {}
+  node_exporter.yaml: {}
+  vmagent.yaml: {}

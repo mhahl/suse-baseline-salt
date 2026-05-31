@@ -1,0 +1,9 @@
+# Scrape configuration for vmagent
+# Managed by Salt
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+{{ vmagent.get('scrape_configs', '- job_name: node\n  static_configs:\n    - targets: ["localhost:9100"]') | indent(2) }}

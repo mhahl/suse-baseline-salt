@@ -1,172 +1,190 @@
-# SUSE Baseline (suse-baseline-salt)
+# SUSE Baseline
 
-SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed** (and modern SUSE).
+> SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed** (and modern SUSE).
 
-## What it does
+[![Salt](https://img.shields.io/badge/Salt-3006%2B-blue)](https://saltproject.io/)
+[![openSUSE](https://img.shields.io/badge/openSUSE-Tumbleweed%20%7C%20Leap-green)](https://www.opensuse.org/)
+[![Goss](https://img.shields.io/badge/Tests-Goss-orange)](https://goss.rocks/)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-**Core modules** (original narrow forensic/privacy focus):
+---
 
-- **systemd-resolved** — Strict DNS-over-TLS + DNSSEC, no fallback, no MulticastDNS/LLMNR
-- **chrony** — Hardened NTP
-- **banner** + **profile** — Forensic bash history, session security, umask, etc.
+## ✨ Features
 
-**Additional hardening modules** (added for broader baseline):
+This project provides a **modular** baseline for SUSE systems with clear separation between hardening and observability.
 
-- **sysctl** — Kernel & network hardening (official SUSE recommendations + modern defaults)
-- **coredump** — Systemd-coredump limits + storage control
-- **audit** — Forensic auditd rules (file watches, privilege escalation, etc.)
-- **sudo** — Require TTY, full logging, restricted paths
-- **pam** — faillock (lockout), pwquality, strong password policies
-- **firewalld** — Default-deny with explicit allow list from pillar
-- **fapolicyd** — Execution control / allowlisting (disabled by default)
-- **usb** — Block USB storage devices
-- **grub** — Bootloader password + hardened GRUB settings
-- **integrity** — rpm -Va checks (+ optional AIDE)
-- **updates** — Zypper policy for Tumbleweed (auto-dup is off by default)
+| Category     | Modules |
+|--------------|---------|
+| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `coredump`, `updates` |
+| **Hardening**    | `sysctl`, `audit`, `sudo`, `pam`, `fapolicyd`, `usb`, `grub`, `integrity` |
+| **Network**      | `firewalld` |
+| **Monitoring**   | `falco`, `node_exporter`, `vmagent` |
 
-## Quick start
+### Highlights
+
+- **Forensic-ready** bash history and session controls
+- **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP)
+- **Modern security controls** (Falco, execution allowlisting, USB blocking)
+- **Observability out of the box** (Falco events + Prometheus metrics via VictoriaMetrics)
+- **Fully modular** — enable only what you need via pillar
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-# Target a minion (or use your normal targeting)
+# Apply the full baseline
 salt '*' state.apply baseline
+
+# Or apply just monitoring
+salt '*' state.apply monitoring
 ```
 
-Or via top file / highstate if you already include `baseline` in your pillar top.
+Or include it via your top file / highstate.
 
-## Pillar configuration
+---
 
-See [pillar/baseline.sls](pillar/baseline.sls). Example:
+## 📦 Configuration
+
+All configuration lives in pillar. See the modular structure:
 
 ```yaml
-baseline:
-  systemd_resolved:
-    dns: "76.76.2.22#xldfopbe6w.dns.controld.com"   # Control D DoT endpoint
-  ntp:
-    servers:
-      - time1.google.com
-      - time2.google.com
-    iburst: true
+# pillar/top.sls
+base:
+  '*':
+    - baseline.system
+    - baseline.hardening
+    - baseline.network
+    - monitoring.falco
+    - monitoring.node_exporter
+    - monitoring.vmagent
 ```
 
-Override in your own pillar as needed.
+### Example Pillar
 
-## Important notes / warnings
+See:
+- [`pillar/baseline/system/init.sls`](pillar/baseline/system/init.sls)
+- [`pillar/baseline/hardening/init.sls`](pillar/baseline/hardening/init.sls)
+- [`pillar/monitoring/falco.sls`](pillar/monitoring/falco.sls)
+- [`pillar/monitoring/vmagent.sls`](pillar/monitoring/vmagent.sls)
 
-- The resolved module **forcefully manages** `/etc/resolv.conf` (symlink takeover). This is intentional for the privacy goals but will conflict with NetworkManager or other resolvers if they are also active.
-- History settings and `PROMPT_COMMAND` changes are aggressive for incident-response purposes. Test in a safe environment first.
-- `TMOUT`, fancy prompts, and some hardening only apply to interactive shells.
-- **USB storage is blocked by default** in this baseline.
-- **Firewalld is placed in drop mode** — only explicitly allowed services/ports will work.
-- **No SSH hardening module** is included (managed by FreeIPA in the target environment).
-- **No AppArmor states** (Tumbleweed uses SELinux in the target deployment).
-- Several modules (grub password, fapolicyd, AIDE, automatic updates) are conservative or disabled by default — review pillar before enabling.
+---
 
-## Verification (after apply)
+## 🛠️ Development & Testing
+
+### On a SUSE VM (Recommended)
 
 ```bash
-# DNS + NTP (original)
+# One-time setup
+sudo ./scripts/setup-test-vm.sh
+
+# Run tests
+make lint
+make goss
+make goss-falco
+make goss-vmagent
+```
+
+### Available Make Targets
+
+| Command                    | Description                     |
+|---------------------------|---------------------------------|
+| `make lint`               | Run yamllint                    |
+| `make goss`               | Run all Goss tests              |
+| `make goss-<component>`   | Run tests for a specific module |
+| `make install-goss`       | Download Goss binary            |
+
+See the [Makefile](Makefile) for more options.
+
+### CI
+
+Only **yamllint** runs automatically on push/PR.
+
+See [`.github/workflows/yamllint.yml`](.github/workflows/yamllint.yml).
+
+---
+
+## 📁 Project Structure
+
+```
+salt/
+├── baseline/               # Core hardening
+│   ├── init.sls
+│   ├── system/             # Core system services
+│   ├── hardening/          # Security & hardening
+│   └── network/            # Network configuration
+│
+├── monitoring/             # Observability
+│   ├── init.sls
+│   ├── falco/
+│   ├── node_exporter/
+│   └── vmagent/
+
+pillar/
+├── baseline/
+│   ├── system/
+│   ├── hardening/
+│   └── network/
+│
+└── monitoring/
+    ├── falco.sls
+    ├── node_exporter.sls
+    └── vmagent.sls
+```
+
+---
+
+## ✅ Verification
+
+After applying the states, run these checks:
+
+```bash
+# System
 resolvectl status
 chronyc sources
+systemctl status falco prometheus-node_exporter vmagent
 
-# New hardening
-sysctl -a | grep -E 'rp_filter|dmesg_restrict|ptrace_scope'
-cat /etc/systemd/coredump.conf.d/99-baseline.conf
+# Hardening
+sysctl -a | grep -E 'rp_filter|dmesg_restrict'
 auditctl -l | head
 sudo -l
 cat /etc/security/faillock.conf
-firewall-cmd --list-all
-lsmod | grep -E 'usb_storage|uas' || echo "USB storage blocked (good)"
-ls /etc/sudoers.d/99-baseline
-cat /var/log/baseline-last-update
 
-# MOTD (on new login)
-cat /etc/motd.d/99-steggy
+# Monitoring
+curl -s http://localhost:9100/metrics | head
+journalctl -u falco -n 20
 ```
 
-## Requirements
+---
 
-- Salt minion on openSUSE Tumbleweed (or recent Leap/SLES where the states are known to work)
-- `systemd-resolved` and `chrony` packages available
+## ⚠️ Important Notes
 
-## Layout
+- **Firewalld** is set to `drop` zone by default.
+- **USB storage** is blocked by default (`usb` module).
+- **No SSH hardening** is included (assumed to be handled by FreeIPA).
+- Several modules are **disabled by default** — enable them explicitly in pillar.
+- The `vmagent` binary is downloaded from GitHub releases.
 
-```
-salt/baseline/
-├── init.sls
-├── systemd-resolved/
-├── chrony/
-├── profile/
-├── banner/
-├── sysctl/
-├── coredump/
-├── audit/
-├── sudo/
-├── pam/
-├── firewalld/
-├── fapolicyd/
-├── usb/
-├── grub/
-├── integrity/
-└── updates/
-pillar/
-└── baseline.sls
-```
+---
 
-## Testing
+## 📋 Requirements
 
-This repository uses [Goss](https://goss.rocks/) for validating Salt states on a real SUSE system.
+- Salt minion on openSUSE Tumbleweed or Leap 15.x+
+- Root access for package installation
 
-### GitHub Actions
+---
 
-Only **yamllint** runs in CI on push/PR:
+## 🤝 Contributing
 
-```bash
-make lint
-```
+Contributions are welcome! Please:
 
-See [.github/workflows/yamllint.yml](.github/workflows/yamllint.yml).
+1. Fork the repo
+2. Add or update a module under `salt/baseline/` or `salt/monitoring/`
+3. Add corresponding Goss tests in `goss/`
+4. Update pillar examples
+5. Run `make lint` and `make goss-<your-module>`
 
-### Manual Testing on a SUSE VM
+---
 
-Tests are intended to be run manually on a SUSE VM (Tumbleweed or Leap) after applying the Salt states.
-
-#### Quick VM Setup
-
-Run the following script on a fresh SUSE VM to install Salt, Goss, and prepare the environment:
-
-```bash
-sudo ./scripts/setup-test-vm.sh
-```
-
-This will:
-- Install `salt-minion`, `make`, `goss`, and common packages used by the baseline
-- Set up symlinks under `/srv/salt` and `/srv/pillar`
-- Print the next commands to apply states and run tests
-
-#### Running Tests
-
-```bash
-# Install goss (if not already present)
-make install-goss
-
-# Run yamllint
-make lint
-
-# Run all Goss tests
-make goss
-
-# Run tests for a specific component
-make goss-sysctl
-make goss-firewalld
-make goss-profile
-```
-
-### Adding new tests
-
-1. Create `goss/<component>.yaml`
-2. Add it to `goss/goss.yaml` (for `make goss`)
-3. Optionally add a convenience target in the Makefile
-
-Contributions and feedback welcome. This started as a personal hardening collection and is intentionally small.
-
-
+**Made for real-world SUSE environments.**  
+Contributions and feedback are appreciated!
