@@ -32,7 +32,9 @@ docker run --rm --privileged \
     zypper --non-interactive install --no-recommends \
       salt-minion curl ca-certificates systemd procps iproute2 firewalld >/dev/null
 
-    curl -fsSL https://goss.rocks/install.sh | sh >/dev/null 2>&1
+    curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /usr/local/bin/goss
+    chmod +rx /usr/local/bin/goss
+
     export PATH="/usr/local/bin:$PATH"
 
     mkdir -p /srv/salt /srv/pillar /etc/salt
