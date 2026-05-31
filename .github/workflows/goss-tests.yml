@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Goss tests in openSUSE Tumbleweed container
         run: |
-          docker run --rm --privileged \
+          docker run --rm --privileged --user root \
             -v ${{ github.workspace }}:/workspace \
             opensuse/tumbleweed:latest \
             /bin/bash -euo pipefail -c '

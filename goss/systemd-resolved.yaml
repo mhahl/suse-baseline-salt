@@ -7,10 +7,8 @@ package:
 service:
   systemd-resolved:
     enabled: true
+    # In Goss container tests we intentionally do not start services
     running: false
-    skip:
-      - command: "systemd-detect-virt --container"
-        exit-status: 0
 
 file:
   /etc/systemd/resolved.conf:

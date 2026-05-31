@@ -7,11 +7,8 @@ package:
 service:
   firewalld:
     enabled: true
-    # running is unreliable in containers without full systemd
+    # In Goss container tests we intentionally do not start services
     running: false
-    skip:
-      - command: "systemd-detect-virt --container"
-        exit-status: 0
 
 command:
   "firewall-cmd --get-default-zone":

@@ -1,19 +1,26 @@
 {# Common variables for baseline states #}
 
-{# Detect if running inside a container (Docker, Podman, LXC, etc.)
-   This is used to skip service management and certain commands that
-   require a full systemd environment.
+{# Robust container detection.
+   We prefer lightweight file-based checks first (no external commands),
+   then fall back to grains, then systemd-detect-virt as last resort.
 #}
-{%- set is_container = salt['cmd.run'](
+{%- set has_dockerenv = salt['file.file_exists']('/.dockerenv') %}
+{%- set has_containerenv = salt['file.file_exists']('/run/.containerenv') %}
+
+{%- set virtual = grains.get('virtual', '') | lower %}
+{%- set virtual_subtype = grains.get('virtual_subtype', '') | lower %}
+
+{%- set grains_says_container = virtual in ('container', 'docker', 'lxc', 'systemd-nspawn', 'podman') or
+                               'container' in virtual or
+                               virtual_subtype in ('docker', 'lxc', 'container', 'podman') %}
+
+{# Last resort: call systemd-detect-virt (with ignore_retcode so it never breaks rendering) #}
+{%- set virt_output = salt['cmd.run'](
       'systemd-detect-virt --container 2>/dev/null || echo "none"',
-      python_shell=True
-    ).strip() not in ('none', '') %}
+      python_shell=True,
+      ignore_retcode=True
+    ) | trim | lower %}
 
-{# Alternative detection using grains (sometimes available) #}
-{%- set virtual = grains.get('virtual', '') %}
-{%- set virtual_subtype = grains.get('virtual_subtype', '') %}
-{%- set grains_container = virtual in ('container', 'docker', 'lxc', 'systemd-nspawn') or
-                          virtual_subtype in ('docker', 'lxc', 'container') %}
+{%- set systemd_says_container = virt_output not in ('none', '', 'none\n') %}
 
-{# Final effective value - prefer systemd-detect-virt, fall back to grains #}
-{%- set running_in_container = is_container or grains_container %}
+{%- set running_in_container = has_dockerenv or has_containerenv or grains_says_container or systemd_says_container %}

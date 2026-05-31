@@ -25,7 +25,7 @@ echo ">>> GOSS + SALT TEST RUNNER"
 echo ">>> Component: $COMPONENT"
 echo "================================================================================"
 
-docker run --rm --privileged \
+docker run --rm --privileged --user root \
   -v "$REPO_ROOT:/workspace" \
   opensuse/tumbleweed:latest \
   /bin/bash -x -euo pipefail -c '
