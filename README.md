@@ -112,43 +112,45 @@ pillar/
 └── baseline.sls
 ```
 
-## Testing with Goss (Server Spec)
+## Testing
 
-This repository uses [goss](https://goss.rocks/) to validate that each Salt component produces the expected system state.
+This repository uses [Goss](https://goss.rocks/) for validating Salt states on a real SUSE system.
 
 ### GitHub Actions
 
-On every push and pull request, a matrix workflow runs in GitHub Actions:
-
-- Spins up a fresh `opensuse/tumbleweed` container
-- Applies the specific component via `salt-call --local`
-- Runs the corresponding Goss test file from `goss/<component>.yaml`
-
-See [.github/workflows/goss-tests.yml](.github/workflows/goss-tests.yml).
-
-### Running locally
+Only **yamllint** runs in CI on push/PR:
 
 ```bash
-# Test a single component
-./tests/run-goss-component.sh sysctl
-./tests/run-goss-component.sh profile
-./tests/run-goss-component.sh firewalld
-
-# Or run full suite manually (requires Docker + Tumbleweed image)
+make lint
 ```
 
-You can also run goss directly against a live system after applying states:
+See [.github/workflows/yamllint.yml](.github/workflows/yamllint.yml).
+
+### Manual Testing on a SUSE VM
+
+Tests are intended to be run manually on a SUSE VM (Tumbleweed or Leap) after applying the Salt states.
 
 ```bash
-goss --gossfile goss/sysctl.yaml validate
+# Install goss (if not already present)
+make install-goss
+
+# Run yamllint
+make lint
+
+# Run all Goss tests
+make goss
+
+# Run tests for a specific component
+make goss-sysctl
+make goss-firewalld
+make goss-profile
 ```
 
 ### Adding new tests
 
 1. Create `goss/<component>.yaml`
-2. Add the component to the matrix in `.github/workflows/goss-tests.yml`
-3. Add it to `goss/goss.yaml` (for full baseline runs)
-4. Update `tests/run-goss-component.sh` help text if needed
+2. Add it to `goss/goss.yaml` (for `make goss`)
+3. Optionally add a convenience target in the Makefile
 
 Contributions and feedback welcome. This started as a personal hardening collection and is intentionally small.
 
