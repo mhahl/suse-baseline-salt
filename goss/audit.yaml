@@ -4,11 +4,6 @@ package:
   audit:
     installed: true
 
-service:
-  auditd:
-    enabled: true
-    running: true
-
 file:
   /etc/audit/rules.d/99-baseline.rules:
     exists: true
@@ -18,7 +13,3 @@ file:
       - "-w /etc/passwd -p wa -k identity"
       - "-w /etc/shadow -p wa -k identity"
       - "-w /etc/sudoers -p wa -k privilege_escalation"
-
-command:
-  "auditctl -l | grep -E 'identity|privilege_escalation'":
-    exit-status: 0

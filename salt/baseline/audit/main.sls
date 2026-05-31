@@ -1,6 +1,8 @@
 # Auditd forensic rules for SUSE baseline
 # Requires audit package (usually present on Tumbleweed)
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 audit_package:
   pkg.installed:
     - name: audit
@@ -23,6 +25,7 @@ audit_rules:
     - require:
       - file: audit_rules
 
+{% if not running_in_container %}
 auditd_service:
   service.running:
     - name: auditd
@@ -32,3 +35,9 @@ auditd_service:
     - require:
       - pkg: audit_package
       - cmd: audit_rules
+{% else %}
+# Skip starting auditd in containers (no full systemd)
+auditd_service_skipped:
+  test.show_notification:
+    - text: "Skipping auditd service management (running in container)"
+{% endif %}

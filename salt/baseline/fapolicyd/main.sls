@@ -1,5 +1,7 @@
 # fapolicyd - File Access Policy Daemon (execution control / allowlisting)
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 fapolicyd_package:
   pkg.installed:
     - name: fapolicyd
@@ -16,6 +18,7 @@ fapolicyd_config:
     - require:
       - pkg: fapolicyd_package
 
+{% if not running_in_container %}
 fapolicyd_service:
   service.running:
     - name: fapolicyd
@@ -24,3 +27,8 @@ fapolicyd_service:
       - file: fapolicyd_config
     - require:
       - pkg: fapolicyd_package
+{% else %}
+fapolicyd_service_skipped:
+  test.show_notification:
+    - text: "Skipping fapolicyd service (running in container)"
+{% endif %}

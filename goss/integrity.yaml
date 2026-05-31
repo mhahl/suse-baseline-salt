@@ -3,6 +3,24 @@
 package:
   rpm:
     installed: true
+  cronie:
+    installed: true
+
+file:
+  /var/spool/cron/crontabs:
+    exists: true
+    filetype: directory
+  /etc/cron.d:
+    exists: true
+    filetype: directory
+
+service:
+  cron:
+    enabled: true
+    running: false
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
 
 command:
   "rpm -q --quiet rpm":

@@ -4,8 +4,11 @@ package:
   fapolicyd:
     installed: false   # Change to true if you enable the module
 
-# When enabled:
+# When enabled in non-container:
 # service:
 #   fapolicyd:
 #     enabled: true
-#     running: true
+#     running: false
+#     skip:
+#       - command: "systemd-detect-virt --container"
+#         exit-status: 0

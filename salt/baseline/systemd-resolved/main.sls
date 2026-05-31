@@ -1,4 +1,7 @@
 # Install systemd-resolved (available directly on openSUSE Tumbleweed 2026+)
+
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 systemd_resolved_package:
   pkg.installed:
     - name: systemd-resolved
@@ -28,6 +31,7 @@ resolved_config:
     - require:
       - pkg: systemd_resolved_package
 
+{% if not running_in_container %}
 # Ensure the stub resolver symlink (required for systemd-resolved)
 # Note: force: True intentionally takes over /etc/resolv.conf from other managers.
 resolv_conf_symlink:
@@ -39,7 +43,9 @@ resolv_conf_symlink:
       - pkg: systemd_resolved_package
       - file: resolved_runtime_dir
       - file: resolved_config
+{% endif %}
 
+{% if not running_in_container %}
 # Enable and start the service
 resolved_service:
   service.running:
@@ -50,3 +56,8 @@ resolved_service:
     - require:
       - pkg: systemd_resolved_package
       - file: resolv_conf_symlink
+{% else %}
+resolved_service_skipped:
+  test.show_notification:
+    - text: "Skipping systemd-resolved service and resolv.conf symlink (running in container)"
+{% endif %}

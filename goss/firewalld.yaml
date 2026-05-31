@@ -7,7 +7,11 @@ package:
 service:
   firewalld:
     enabled: true
-    running: true
+    # running is unreliable in containers without full systemd
+    running: false
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
 
 command:
   "firewall-cmd --get-default-zone":

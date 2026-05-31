@@ -42,18 +42,29 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             opensuse/tumbleweed:latest \
             /bin/bash -euo pipefail -c '
-              echo "=== Setting up Tumbleweed container for component: ${{ matrix.component }} ==="
+              echo ""
+              echo "================================================================================"
+              echo ">>> SETTING UP CONTAINER FOR: ${{ matrix.component }}"
+              echo "================================================================================"
 
               # Install dependencies
               zypper --non-interactive refresh
-              zypper --non-interactive install --no-recommends \
-                salt-minion \
-                curl \
-                ca-certificates \
-                systemd \
-                procps \
-                iproute2 \
-                firewalld
+
+              BASE_PACKAGES="salt-minion curl ca-certificates systemd procps iproute2 firewalld"
+
+              # Component-specific extra packages
+              EXTRA_PACKAGES=""
+              if [[ "${{ matrix.component }}" == "integrity" ]]; then
+                EXTRA_PACKAGES="cronie"
+              fi
+
+              zypper --non-interactive install --no-recommends $BASE_PACKAGES $EXTRA_PACKAGES
+
+              # Fix for Salt's cron execution module in minimal Tumbleweed containers
+              if [[ "${{ matrix.component }}" == "integrity" ]]; then
+                mkdir -p /var/spool/cron/crontabs /etc/cron.d
+                touch /var/spool/cron/crontabs/root 2>/dev/null || true
+              fi
 
               # Install Goss
               echo "Installing Goss..."
@@ -96,24 +107,31 @@ jobs:
           EOF
 
               # Apply the Salt state for this component
-              echo "Applying Salt state: baseline.${{ matrix.component }}.main"
+              echo ""
+              echo "================================================================================"
+              echo ">>> SALT APPLY: baseline.${{ matrix.component }}.main"
+              echo "================================================================================"
               salt-call --local --retcode-passthrough state.apply baseline.${{ matrix.component }}.main --log-level=warning || {
                 echo "Salt apply failed for ${{ matrix.component }}"
                 exit 1
               }
 
-              echo "=== Salt state applied successfully ==="
-
               # Run Goss test
+              echo ""
+              echo "================================================================================"
+              echo ">>> GOSS VALIDATION"
+              echo "================================================================================"
               GOSSFILE="/workspace/goss/${{ matrix.component }}.yaml"
               if [ -f "$GOSSFILE" ]; then
-                echo "Running Goss tests from $GOSSFILE"
                 goss --gossfile "$GOSSFILE" validate
               else
                 echo "No goss file found for ${{ matrix.component }} at $GOSSFILE - skipping"
               fi
 
-              echo "=== Goss tests completed for ${{ matrix.component }} ==="
+              echo ""
+              echo "================================================================================"
+              echo ">>> FINISHED: ${{ matrix.component }}"
+              echo "================================================================================"
             '
         shell: bash
         env:

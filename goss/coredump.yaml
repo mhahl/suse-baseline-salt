@@ -12,3 +12,6 @@ file:
 command:
   "systemctl is-active systemd-coredump.socket || true":
     exit-status: 0
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0

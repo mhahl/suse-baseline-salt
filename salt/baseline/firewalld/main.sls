@@ -1,24 +1,35 @@
 # Firewalld hardening - default deny with explicit allow list
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 firewalld_package:
   pkg.installed:
     - name: firewalld
 
+{% if not running_in_container %}
 firewalld_service:
   service.running:
     - name: firewalld
     - enable: True
     - require:
       - pkg: firewalld_package
+{% else %}
+firewalld_service_skipped:
+  test.show_notification:
+    - text: "Skipping firewalld service management (running in container)"
+{% endif %}
 
-# Set default zone to drop (very restrictive)
+# Set default zone to drop (very restrictive) - only when firewalld is manageable
+{% if not running_in_container %}
 firewalld_default_zone:
   cmd.run:
     - name: firewall-cmd --set-default-zone=drop
     - unless: firewall-cmd --get-default-zone | grep -q '^drop$'
     - require:
       - service: firewalld_service
+{% endif %}
 
+{% if not running_in_container %}
 # Allow services from pillar (e.g. ssh, http, https, cockpit, etc.)
 {% for svc in pillar.get('baseline:firewalld:allowed_services', ['ssh']) %}
 firewalld_allow_{{ svc }}:
@@ -46,3 +57,9 @@ firewalld_reload:
       - cmd: firewalld_allow_ssh
       - cmd: firewalld_default_zone
       - cmd: firewalld_allow_*
+{% else %}
+# Skip all runtime firewall-cmd operations in containers
+firewalld_container_skip:
+  test.show_notification:
+    - text: "Skipping firewalld runtime configuration (running in container)"
+{% endif %}

@@ -19,18 +19,40 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "==> Testing component: $COMPONENT"
+echo ""
+echo "================================================================================"
+echo ">>> GOSS + SALT TEST RUNNER"
+echo ">>> Component: $COMPONENT"
+echo "================================================================================"
 
 docker run --rm --privileged \
   -v "$REPO_ROOT:/workspace" \
   opensuse/tumbleweed:latest \
   /bin/bash -x -euo pipefail -c '
     COMPONENT="'"$COMPONENT"'"
-    echo "=== Setting up for $COMPONENT ==="
+    echo ""
+    echo "================================================================================"
+    echo ">>> SETTING UP CONTAINER FOR: ${COMPONENT}"
+    echo "================================================================================"
 
     zypper --non-interactive refresh >/dev/null 2>&1 || true
-    zypper --non-interactive install --no-recommends \
-      salt-minion curl ca-certificates systemd procps iproute2 firewalld >/dev/null
+
+    # Base packages needed by most components
+    PACKAGES="salt-minion curl ca-certificates systemd procps iproute2 firewalld"
+
+    # Extra packages required by specific components
+    if [[ "$COMPONENT" == "integrity" ]]; then
+      PACKAGES="$PACKAGES cronie"
+    fi
+
+    zypper --non-interactive install --no-recommends $PACKAGES >/dev/null
+
+    # Fix for cron module in minimal containers (required for Salt's cron.present to load)
+    if [[ "$COMPONENT" == "integrity" ]]; then
+      mkdir -p /var/spool/cron/crontabs /etc/cron.d
+      # Some images need the spool initialized
+      touch /var/spool/cron/crontabs/root 2>/dev/null || true
+    fi
 
     curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /usr/local/bin/goss
     chmod +rx /usr/local/bin/goss
@@ -64,14 +86,25 @@ pillar_roots:
     - /srv/pillar
 EOF
 
-    echo "Applying Salt state..."
+    echo ""
+    echo "================================================================================"
+    echo ">>> SALT APPLY: baseline.${COMPONENT}.main"
+    echo "================================================================================"
     salt-call --local --retcode-passthrough state.apply baseline.${COMPONENT}.main --log-level=warning
 
-    echo "Running Goss..."
+    echo ""
+    echo "================================================================================"
+    echo ">>> GOSS VALIDATION"
+    echo "================================================================================"
     GOSSFILE="/workspace/goss/${COMPONENT}.yaml"
     if [ -f "$GOSSFILE" ]; then
       goss --gossfile "$GOSSFILE" validate
     else
       echo "No goss test file found: $GOSSFILE"
     fi
+
+    echo ""
+    echo "================================================================================"
+    echo ">>> FINISHED: ${COMPONENT}"
+    echo "================================================================================"
   '

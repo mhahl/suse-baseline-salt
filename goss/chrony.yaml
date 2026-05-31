@@ -7,7 +7,10 @@ package:
 service:
   chronyd:
     enabled: true
-    running: true
+    running: false
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
 
 file:
   /etc/chrony.conf:

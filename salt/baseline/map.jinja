@@ -1,0 +1,19 @@
+{# Common variables for baseline states #}
+
+{# Detect if running inside a container (Docker, Podman, LXC, etc.)
+   This is used to skip service management and certain commands that
+   require a full systemd environment.
+#}
+{%- set is_container = salt['cmd.run'](
+      'systemd-detect-virt --container 2>/dev/null || echo "none"',
+      python_shell=True
+    ).strip() not in ('none', '') %}
+
+{# Alternative detection using grains (sometimes available) #}
+{%- set virtual = grains.get('virtual', '') %}
+{%- set virtual_subtype = grains.get('virtual_subtype', '') %}
+{%- set grains_container = virtual in ('container', 'docker', 'lxc', 'systemd-nspawn') or
+                          virtual_subtype in ('docker', 'lxc', 'container') %}
+
+{# Final effective value - prefer systemd-detect-virt, fall back to grains #}
+{%- set running_in_container = is_container or grains_container %}
