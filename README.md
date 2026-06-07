@@ -98,7 +98,7 @@ See the [Makefile](Makefile) for more options.
 
 ### CI
 
-- **Goss tests** run on `opensuse-tumbleweed` runners on push/PR to relevant paths.
+- **Goss tests** run in a container on `opensuse-tumbleweed` runners on push/PR to relevant paths.
 
 See [`.forgejo/workflows/goss.yml`](.forgejo/workflows/goss.yml).
 

@@ -1,15 +1,19 @@
 # Forgejo / Gitea Actions workflow
-# Runs the Goss tests on openSUSE Tumbleweed runners.
+# Runs the Goss tests inside a container on openSUSE Tumbleweed runners.
 #
-# The runner label "opensuse-tumbleweed" is expected to be a self-hosted
-# Forgejo runner providing a Tumbleweed environment (native or well-provisioned).
+# - The job is scheduled on runners labeled `opensuse-tumbleweed`
+#   (these runners must have a container runtime available, e.g. Docker/Podman).
+# - The actual test steps execute inside a fresh `opensuse/tumbleweed:latest`
+#   container for a clean, reproducible environment.
+# - `--privileged` is used so that sysctl writes, systemd unit state, etc.
+#   can be exercised as much as possible inside the container.
 #
 # Notes:
 # - Monitoring modules (falco, node_exporter, vmagent) are explicitly enabled
 #   via a CI pillar so their Goss assertions are exercised.
-# - Some assertions (live kernel params, firewalld runtime commands) are
-#   automatically skipped if the runner itself is detected as a container
-#   (via the skip rules in the goss/ files).
+# - Assertions that require a full host (live kernel params, firewalld runtime
+#   commands, etc.) are automatically skipped inside the container via the
+#   existing skip rules in the goss/ files (using `systemd-detect-virt --container`).
 
 name: goss
 
@@ -34,6 +38,9 @@ on:
 jobs:
   goss:
     runs-on: opensuse-tumbleweed
+    container:
+      image: opensuse/tumbleweed:latest
+      options: --privileged
 
     steps:
       - name: Checkout
@@ -73,7 +80,7 @@ jobs:
           ln -sfn "$PWD/pillar/baseline"    /srv/pillar/baseline
           ln -sfn "$PWD/pillar/monitoring"  /srv/pillar/monitoring
 
-          # Minimal top files so highstate / direct apply works on the runner
+          # Minimal top files so highstate / direct apply works inside the test container
           cat > /srv/salt/top.sls << 'EOF'
           base:
             '*':
@@ -121,8 +128,8 @@ jobs:
       - name: Run Goss (all tests)
         run: |
           set -euo pipefail
-          # Goss files contain skip rules for cases where the runner is itself
-          # detected as a container (kernel params, firewalld runtime, etc.).
+          # Goss files contain skip rules that trigger inside containers
+          # (kernel params, firewalld runtime commands, etc.).
           goss --gossfile goss/goss.yaml validate --format tap
 
       - name: Run individual component Goss targets (for visibility)
