@@ -76,23 +76,47 @@ jobs:
           set -euo pipefail
           mkdir -p /srv/salt /srv/pillar
 
-          # In container jobs (job-level `container:`), the checkout is bind-mounted into
-          # the container. $PWD is not always the workspace root when the shell starts.
-          # actions/checkout@v4 sets $GITHUB_WORKSPACE to the correct path inside the container.
-          SRC="${GITHUB_WORKSPACE:-$PWD}"
-          echo "Source directory for symlinks: $SRC"
-          # Make it obvious in logs if the source tree is not visible (common cause of "no matching sls")
-          ls -ld "$SRC" "$SRC/salt/baseline" "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls" 2>/dev/null || echo "WARNING: source tree not visible at expected path"
+          echo "=== Detecting checked-out source tree inside container ==="
+          SRC=""
+          # 1. Try git (reliable if we are inside the work tree)
+          if command -v git >/dev/null 2>&1; then
+            SRC="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+          fi
+          # 2. Most robust: locate an actual file written by actions/checkout
+          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
+            found=$(find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -1 || true)
+            if [ -n "$found" ]; then
+              SRC=$(dirname "$(dirname "$found")")
+            fi
+          fi
+          # 3. Last resort: common paths used by runners + the env var
+          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
+            for cand in "$GITHUB_WORKSPACE" "$PWD" /workspace /home/runner/_work/*/* /__w/*/* /root; do
+              if [ -d "$cand/salt/baseline" ]; then
+                SRC="$cand"
+                break
+              fi
+            done
+          fi
 
-          # Symlink the repo content so state.sls baseline / monitoring can find the SLSes
-          # under the file_roots we configure below.
-          ln -sfn "$SRC/salt/baseline"     /srv/salt/baseline
-          ln -sfn "$SRC/salt/monitoring"  /srv/salt/monitoring
+          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
+            echo "FATAL: Could not locate the checked-out source containing salt/baseline/"
+            echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<unset>}"
+            echo "PWD=$PWD"
+            echo "Some top-level dirs:"
+            ls -1d / /workspace /home/runner /__w /root 2>/dev/null || true
+            echo "Any baseline/ dirs found anywhere:"
+            find / -maxdepth 7 -type d -name baseline 2>/dev/null | head -20 || true
+            exit 1
+          fi
 
-          ln -sfn "$SRC/pillar/baseline"    /srv/pillar/baseline
-          ln -sfn "$SRC/pillar/monitoring"  /srv/pillar/monitoring
+          echo "Source root: $SRC"
+          ls -ld "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls"
 
-          # Minimal top files so highstate / direct apply works inside the test container
+          # Write the generated top.sls + CI pillar into /srv (these are small and provide
+          # the highstate entrypoints + the monitoring enablement overrides).
+          # The real state/pillar content will be reached by listing the real checkout
+          # dirs directly in file_roots / pillar_roots below.
           cat > /srv/salt/top.sls << 'EOF'
           base:
             '*':
@@ -114,7 +138,6 @@ jobs:
               - ci
           EOF
 
-          # CI pillar that turns on the monitoring modules so their Goss tests run
           cat > /srv/pillar/ci.sls << 'EOF'
           monitoring:
             falco:
@@ -130,25 +153,35 @@ jobs:
                     - targets: ['127.0.0.1:9100']
           EOF
 
+          # Write a complete ready-to-use minion config that points at both the generated
+          # tops in /srv and the real content from the checkout. No symlinks needed.
+          mkdir -p /tmp/salt-ci/etc/salt
+          cat > /tmp/salt-ci/etc/salt/minion << EOF
+          file_roots:
+            base:
+              - /srv/salt
+              - $SRC/salt
+          pillar_roots:
+            base:
+              - /srv/pillar
+              - $SRC/pillar
+          EOF
+
+          echo "Minion config:"
+          cat /tmp/salt-ci/etc/salt/minion
           echo "Salt roots and pillars prepared."
 
       - name: Apply Salt states (baseline + monitoring)
         run: |
           set -euo pipefail
-          mkdir -p /tmp/salt-ci/etc/salt
-          cat > /tmp/salt-ci/etc/salt/minion << 'MINIONCFG'
-          file_roots:
-            base:
-              - /srv/salt
-          pillar_roots:
-            base:
-              - /srv/pillar
-          MINIONCFG
 
           echo "SLS roots visible to Salt (under configured file_roots):"
           find /srv/salt -name 'init.sls' | sort || true
           echo "file_roots from this config:"
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning config.get file_roots || true
+
+          echo "Also searching entire container for any copy of the SLS (for debugging):"
+          find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -5 || true
 
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring
