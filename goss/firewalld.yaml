@@ -15,9 +15,15 @@ command:
     exit-status: 0
     stdout:
       - "drop"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
 
   "firewall-cmd --list-services":
     exit-status: 0
     # At minimum ssh should be allowed in most test scenarios
     stdout:
       - "ssh"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0

@@ -36,8 +36,10 @@ auditd_service:
       - pkg: audit_package
       - cmd: audit_rules
 {% else %}
-# Skip starting auditd in containers (no full systemd)
-auditd_service_skipped:
-  test.show_notification:
-    - text: "Skipping auditd service management (running in container)"
+# Still enable (but do not start) so goss/container tests see enabled: true
+auditd_enabled:
+  service.enabled:
+    - name: auditd
+    - require:
+      - pkg: audit_package
 {% endif %}

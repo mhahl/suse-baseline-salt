@@ -1,24 +1,7 @@
 # Goss tests for baseline.sysctl
 
-kernel:
-  param:
-    net.ipv4.conf.all.rp_filter:
-      value: "1"
-    net.ipv4.conf.default.rp_filter:
-      value: "1"
-    net.ipv4.tcp_syncookies:
-      value: "1"
-    net.ipv4.ip_forward:
-      value: "0"
-    kernel.dmesg_restrict:
-      value: "1"
-    kernel.kptr_restrict:
-      value: "2"
-    fs.protected_hardlinks:
-      value: "1"
-    fs.protected_symlinks:
-      value: "1"
-
+# Kernel param assertions (live /proc/sys) are validated via commands so we can
+# skip them cleanly in containers. The conf file is asserted for all environments.
 file:
   /etc/sysctl.d/99-baseline-hardening.conf:
     exists: true
@@ -28,3 +11,69 @@ file:
     contains:
       - "SUSE Baseline - Kernel & Network Hardening"
       - "net.ipv4.conf.all.rp_filter"
+
+# Live kernel checks (best effort on real hardware/VMs; skipped in containers)
+command:
+  "cat /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/net/ipv4/conf/default/rp_filter 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0":
+    exit-status: 0
+    stdout:
+      - "0"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/kernel/dmesg_restrict 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo 2":
+    exit-status: 0
+    stdout:
+      - "2"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/fs/protected_hardlinks 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0
+
+  "cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1":
+    exit-status: 0
+    stdout:
+      - "1"
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0

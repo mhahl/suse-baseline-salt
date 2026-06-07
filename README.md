@@ -98,9 +98,13 @@ See the [Makefile](Makefile) for more options.
 
 ### CI
 
-Only **yamllint** runs automatically on push/PR.
+- **yamllint** runs on push/PR.
+- **Goss tests** run in a container (openSUSE Tumbleweed) on push/PR to relevant paths.
 
-See [`.github/workflows/yamllint.yml`](.github/workflows/yamllint.yml).
+See:
+- [`.forgejo/workflows/goss.yml`](.forgejo/workflows/goss.yml)
+- [`.github/workflows/goss.yml`](.github/workflows/goss.yml) (compat)
+- [`.github/workflows/yamllint.yml`](.github/workflows/yamllint.yml)
 
 ---
 

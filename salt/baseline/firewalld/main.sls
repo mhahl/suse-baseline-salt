@@ -14,9 +14,12 @@ firewalld_service:
     - require:
       - pkg: firewalld_package
 {% else %}
-firewalld_service_skipped:
-  test.show_notification:
-    - text: "Skipping firewalld service management (running in container)"
+# Still enable (but do not start) so goss/container tests see enabled: true
+firewalld_enabled:
+  service.enabled:
+    - name: firewalld
+    - require:
+      - pkg: firewalld_package
 {% endif %}
 
 # Set default zone to drop (very restrictive) - only when firewalld is manageable

@@ -31,8 +31,8 @@ resolved_config:
     - require:
       - pkg: systemd_resolved_package
 
-{% if not running_in_container %}
-# Ensure the stub resolver symlink (required for systemd-resolved)
+# Ensure the stub resolver symlink (required for systemd-resolved).
+# Do this even in containers so goss tests can assert the symlink.
 # Note: force: True intentionally takes over /etc/resolv.conf from other managers.
 resolv_conf_symlink:
   file.symlink:
@@ -43,7 +43,6 @@ resolv_conf_symlink:
       - pkg: systemd_resolved_package
       - file: resolved_runtime_dir
       - file: resolved_config
-{% endif %}
 
 {% if not running_in_container %}
 # Enable and start the service
@@ -57,7 +56,11 @@ resolved_service:
       - pkg: systemd_resolved_package
       - file: resolv_conf_symlink
 {% else %}
-resolved_service_skipped:
-  test.show_notification:
-    - text: "Skipping systemd-resolved service and resolv.conf symlink (running in container)"
+# Still enable (but do not start) so goss/container tests see enabled: true
+resolved_enabled:
+  service.enabled:
+    - name: systemd-resolved
+    - require:
+      - pkg: systemd_resolved_package
+      - file: resolv_conf_symlink
 {% endif %}

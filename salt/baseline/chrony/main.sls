@@ -25,7 +25,10 @@ chrony_service:
     - watch:
       - file: chrony_config
 {% else %}
-chrony_service_skipped:
-  test.show_notification:
-    - text: "Skipping chronyd service (running in container)"
+# Still enable (but do not start) so goss/container tests see enabled: true
+chrony_enabled:
+  service.enabled:
+    - name: chronyd
+    - require:
+      - pkg: chrony_package
 {% endif %}

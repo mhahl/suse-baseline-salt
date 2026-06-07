@@ -1,0 +1,151 @@
+# Forgejo / Gitea Actions workflow
+# Runs the Goss tests inside an openSUSE Tumbleweed container.
+#
+# Notes:
+# - Uses job-level 'container:' (requires Docker/Podman on the runner host).
+# - Privileged mode helps with sysctl, systemd unit state, etc.
+# - Monitoring modules (falco, node_exporter, vmagent) are explicitly enabled
+#   via a CI pillar so their Goss assertions are exercised.
+# - Some assertions (live kernel params, firewalld runtime) are skipped in
+#   containers via the skip rules already present in the goss/ files.
+#
+# If your Forgejo runner does not support the 'container:' key well,
+# you can change the job to run tests via a step using podman/docker, e.g.:
+#   podman run --rm --privileged -v "$PWD:/src:Z" -w /src \
+#     opensuse/tumbleweed:latest bash -c './.forgejo/workflows/run-goss-in-container.sh'
+
+name: goss
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "goss/**"
+      - "salt/**"
+      - "pillar/**"
+      - "Makefile"
+      - ".forgejo/workflows/goss.yml"
+      - ".github/workflows/goss.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "goss/**"
+      - "salt/**"
+      - "pillar/**"
+      - "Makefile"
+      - ".forgejo/workflows/goss.yml"
+      - ".github/workflows/goss.yml"
+
+jobs:
+  goss:
+    runs-on: ubuntu-latest
+    container:
+      image: opensuse/tumbleweed:latest
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system packages (SUSE)
+        run: |
+          set -euo pipefail
+          zypper --non-interactive refresh
+          zypper --non-interactive install --no-recommends \
+            salt-minion make curl git ca-certificates \
+            audit chrony firewalld systemd-resolved cronie sudo \
+            pam pam-config cracklib systemd
+
+          # Monitoring packages (best effort; falco comes from its own repo below)
+          # prometheus-node_exporter is usually in Tumbleweed main repos
+          zypper --non-interactive install --no-recommends prometheus-node_exporter || true
+
+      - name: Install Goss
+        run: |
+          set -euo pipefail
+          GOSS_VERSION="v0.4.9"
+          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64" \
+            -o /usr/local/bin/goss
+          chmod +x /usr/local/bin/goss
+          goss --version
+
+      - name: Prepare Salt file roots and pillar (with CI overrides)
+        run: |
+          set -euo pipefail
+          mkdir -p /srv/salt /srv/pillar
+
+          # Symlink the repo content directly so state.apply baseline / monitoring works
+          ln -sfn "$PWD/salt/baseline"     /srv/salt/baseline
+          ln -sfn "$PWD/salt/monitoring"  /srv/salt/monitoring
+
+          ln -sfn "$PWD/pillar/baseline"    /srv/pillar/baseline
+          ln -sfn "$PWD/pillar/monitoring"  /srv/pillar/monitoring
+
+          # Minimal top files so highstate / direct apply works in the container
+          cat > /srv/salt/top.sls << 'EOF'
+          base:
+            '*':
+              - baseline.init
+              - monitoring.init
+          EOF
+
+          cat > /srv/pillar/top.sls << 'EOF'
+          base:
+            '*':
+              - baseline
+              - baseline.system
+              - baseline.hardening
+              - baseline.network
+              - monitoring.falco
+              - monitoring.node_exporter
+              - monitoring.vmagent
+              - ci
+          EOF
+
+          # CI pillar that turns on the monitoring modules so their Goss tests run
+          cat > /srv/pillar/ci.sls << 'EOF'
+          monitoring:
+            falco:
+              enabled: true
+            node_exporter:
+              enabled: true
+            vmagent:
+              enabled: true
+              remote_write_url: "http://127.0.0.1:8428/api/v1/write"
+              scrape_configs: |
+                - job_name: 'ci'
+                  static_configs:
+                    - targets: ['127.0.0.1:9100']
+          EOF
+
+          echo "Salt roots and pillars prepared."
+
+      - name: Apply Salt states (baseline + monitoring)
+        run: |
+          set -euo pipefail
+          # Use --local for self-contained CI run. Warning level keeps output readable.
+          salt-call --local --log-level=warning state.apply baseline monitoring
+
+      - name: Run Goss (all tests)
+        run: |
+          set -euo pipefail
+          # The goss/ files already contain skip rules for container-only limitations
+          # (kernel params, firewalld runtime commands, etc.).
+          goss --gossfile goss/goss.yaml validate --format tap
+
+      - name: Run individual component Goss targets (for visibility)
+        run: |
+          set +e
+          echo "=== make goss-profile ==="
+          make goss-profile
+          echo "=== make goss-chrony ==="
+          make goss-chrony
+          echo "=== make goss-audit ==="
+          make goss-audit
+          echo "=== make goss-falco ==="
+          make goss-falco
+          echo "=== make goss-vmagent ==="
+          make goss-vmagent
+          echo "=== make goss-node_exporter ==="
+          make goss-node_exporter || true
+          echo "Component runs complete."

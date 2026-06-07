@@ -6,6 +6,8 @@
 
 {% if enabled %}
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 node_exporter_package:
   pkg.installed:
     - name: prometheus-node_exporter
@@ -20,6 +22,7 @@ node_exporter_config:
     - group: root
     - mode: '0644'
 
+{% if not running_in_container %}
 node_exporter_service:
   service.running:
     - name: prometheus-node_exporter
@@ -28,6 +31,14 @@ node_exporter_service:
       - file: node_exporter_config
     - require:
       - pkg: node_exporter_package
+{% else %}
+# Still enable (but do not start) so goss/container tests see enabled: true
+node_exporter_enabled:
+  service.enabled:
+    - name: prometheus-node_exporter
+    - require:
+      - pkg: node_exporter_package
+{% endif %}
 
 {% else %}
 

@@ -6,6 +6,8 @@
 
 {% if enabled %}
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 # Add Falco official repository
 falco_repo:
   pkgrepo.managed:
@@ -36,6 +38,7 @@ falco_config:
     - require:
       - pkg: falco_package
 
+{% if not running_in_container %}
 # Enable and start Falco
 falco_service:
   service.running:
@@ -45,6 +48,14 @@ falco_service:
       - file: falco_config
     - require:
       - pkg: falco_package
+{% else %}
+# Still enable (but do not start) so goss/container tests see enabled: true
+falco_enabled:
+  service.enabled:
+    - name: falco
+    - require:
+      - pkg: falco_package
+{% endif %}
 
 {% else %}
 

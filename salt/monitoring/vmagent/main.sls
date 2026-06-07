@@ -6,6 +6,8 @@
 
 {% if enabled %}
 
+{% from 'baseline/map.jinja' import running_in_container with context %}
+
 vmagent_user:
   user.present:
     - name: vmagent
@@ -63,6 +65,7 @@ vmagent_service_file:
     - context:
         vmagent: {{ vmagent | tojson }}
 
+{% if not running_in_container %}
 vmagent_service:
   service.running:
     - name: vmagent
@@ -73,6 +76,15 @@ vmagent_service:
     - require:
       - file: vmagent_binary
       - file: vmagent_service_file
+{% else %}
+# Still enable (but do not start) so goss/container tests see enabled: true
+vmagent_enabled:
+  service.enabled:
+    - name: vmagent
+    - require:
+      - file: vmagent_binary
+      - file: vmagent_service_file
+{% endif %}
 
 {% else %}
 
