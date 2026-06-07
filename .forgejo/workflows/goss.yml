@@ -140,7 +140,12 @@ jobs:
           MINIONCFG
 
           # --local forces masterless operation; -c points at our config.
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.apply baseline monitoring
+          # Apply sequentially (one SLS list per invocation). Using a single
+          # state.sls call with "baseline,monitoring" would also work, but separate
+          # calls produce clearer per-state output and avoid any CLI arg parsing
+          # differences across Salt versions.
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring
 
       - name: Run Goss (all tests)
         run: |
