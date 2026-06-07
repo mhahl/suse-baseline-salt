@@ -10,8 +10,10 @@ file:
       - "Compress=yes"
 
 command:
-  "systemctl is-active systemd-coredump.socket || true":
+  # Container-aware version of the coredump socket check.
+  # - Outside a container: run the real `systemctl is-active ... || true` (always exits 0).
+  # - Inside a container: short-circuit to exit 0 (the live socket status is not meaningful,
+  #   and we avoid the conditional `skip` list syntax under a `command:` resource, which
+  #   can cause "cannot unmarshal !!seq into bool" in Goss v0.4.9).
+  "sh -c 'systemd-detect-virt --container >/dev/null 2>&1 && exit 0 || systemctl is-active systemd-coredump.socket || true'":
     exit-status: 0
-    skip:
-      - command: "systemd-detect-virt --container"
-        exit-status: 0
