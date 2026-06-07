@@ -18,7 +18,6 @@ gossfile:
   fapolicyd.yaml: {}
   usb.yaml: {}
   grub.yaml: {}
-  integrity.yaml: {}
   updates.yaml: {}
 
   # Monitoring modules

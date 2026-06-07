@@ -16,7 +16,7 @@ This project provides a **modular** baseline for SUSE systems with clear separat
 | Category     | Modules |
 |--------------|---------|
 | **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `coredump`, `updates` |
-| **Hardening**    | `sysctl`, `audit`, `sudo`, `pam`, `fapolicyd`, `usb`, `grub`, `integrity` |
+| **Hardening**    | `sysctl`, `audit`, `sudo`, `pam`, `fapolicyd`, `usb`, `grub` |
 | **Network**      | `firewalld` |
 | **Monitoring**   | `falco`, `node_exporter`, `vmagent` |
 

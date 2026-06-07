@@ -7,4 +7,3 @@ include:
   - baseline.fapolicyd.main
   - baseline.usb.main
   - baseline.grub.main
-  - baseline.integrity.main

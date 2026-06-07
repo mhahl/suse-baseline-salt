@@ -28,6 +28,3 @@ baseline:
 
   grub:
     # password_hash: "grub.pbkdf2.sha512.10000.XXXX..."   # Generate with grub2-mkpasswd-pbkdf2
-
-  integrity:
-    use_aide: false   # Set true to deploy AIDE (heavier)
