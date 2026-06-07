@@ -26,14 +26,14 @@ command:
       exit 0
     fi
     set -e
-    test \"\$(cat /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || echo 1)\" = 1
-    test \"\$(cat /proc/sys/net/ipv4/conf/default/rp_filter 2>/dev/null || echo 1)\" = 1
-    test \"\$(cat /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null || echo 1)\" = 1
-    test \"\$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)\" = 0
-    test \"\$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null || echo 1)\" = 1
-    test \"\$(cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo 2)\" = 2
-    test \"\$(cat /proc/sys/fs/protected_hardlinks 2>/dev/null || echo 1)\" = 1
-    test \"\$(cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/net/ipv4/conf/default/rp_filter 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)\" = 0
+    test \"$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo 2)\" = 2
+    test \"$(cat /proc/sys/fs/protected_hardlinks 2>/dev/null || echo 1)\" = 1
+    test \"$(cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1)\" = 1
   '":
     exit-status: 0
     title: "Live kernel hardening parameters are set (best-effort; skipped in containers)"
