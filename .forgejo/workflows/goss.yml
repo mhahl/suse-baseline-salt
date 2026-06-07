@@ -1,18 +1,15 @@
 # Forgejo / Gitea Actions workflow
-# Runs the Goss tests inside an openSUSE Tumbleweed container.
+# Runs the Goss tests on openSUSE Tumbleweed runners.
+#
+# The runner label "opensuse-tumbleweed" is expected to be a self-hosted
+# Forgejo runner providing a Tumbleweed environment (native or well-provisioned).
 #
 # Notes:
-# - Uses job-level 'container:' (requires Docker/Podman on the runner host).
-# - Privileged mode helps with sysctl, systemd unit state, etc.
 # - Monitoring modules (falco, node_exporter, vmagent) are explicitly enabled
 #   via a CI pillar so their Goss assertions are exercised.
-# - Some assertions (live kernel params, firewalld runtime) are skipped in
-#   containers via the skip rules already present in the goss/ files.
-#
-# If your Forgejo runner does not support the 'container:' key well,
-# you can change the job to run tests via a step using podman/docker, e.g.:
-#   podman run --rm --privileged -v "$PWD:/src:Z" -w /src \
-#     opensuse/tumbleweed:latest bash -c './.forgejo/workflows/run-goss-in-container.sh'
+# - Some assertions (live kernel params, firewalld runtime commands) are
+#   automatically skipped if the runner itself is detected as a container
+#   (via the skip rules in the goss/ files).
 
 name: goss
 
@@ -25,7 +22,6 @@ on:
       - "pillar/**"
       - "Makefile"
       - ".forgejo/workflows/goss.yml"
-      - ".github/workflows/goss.yml"
   pull_request:
     branches: [main]
     paths:
@@ -34,14 +30,10 @@ on:
       - "pillar/**"
       - "Makefile"
       - ".forgejo/workflows/goss.yml"
-      - ".github/workflows/goss.yml"
 
 jobs:
   goss:
-    runs-on: ubuntu-latest
-    container:
-      image: opensuse/tumbleweed:latest
-      options: --privileged
+    runs-on: opensuse-tumbleweed
 
     steps:
       - name: Checkout
@@ -81,7 +73,7 @@ jobs:
           ln -sfn "$PWD/pillar/baseline"    /srv/pillar/baseline
           ln -sfn "$PWD/pillar/monitoring"  /srv/pillar/monitoring
 
-          # Minimal top files so highstate / direct apply works in the container
+          # Minimal top files so highstate / direct apply works on the runner
           cat > /srv/salt/top.sls << 'EOF'
           base:
             '*':
@@ -129,8 +121,8 @@ jobs:
       - name: Run Goss (all tests)
         run: |
           set -euo pipefail
-          # The goss/ files already contain skip rules for container-only limitations
-          # (kernel params, firewalld runtime commands, etc.).
+          # Goss files contain skip rules for cases where the runner is itself
+          # detected as a container (kernel params, firewalld runtime, etc.).
           goss --gossfile goss/goss.yaml validate --format tap
 
       - name: Run individual component Goss targets (for visibility)
