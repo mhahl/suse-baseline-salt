@@ -43,6 +43,12 @@ jobs:
       options: --privileged
 
     steps:
+
+      - name: Install Node.js (required for JS actions)
+        run: |
+          zypper refresh
+          zypper --non-interactive install -y nodejs npm
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -54,9 +60,6 @@ jobs:
             salt-minion make curl git ca-certificates \
             audit chrony firewalld systemd-resolved cronie sudo \
             pam pam-config cracklib systemd
-
-          # Monitoring packages (best effort; falco comes from its own repo below)
-          # prometheus-node_exporter is usually in Tumbleweed main repos
           zypper --non-interactive install --no-recommends prometheus-node_exporter || true
 
       - name: Install Goss
