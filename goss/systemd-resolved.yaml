@@ -23,3 +23,6 @@ file:
     exists: true
     filetype: symlink
     linked-to: /run/systemd/resolve/stub-resolv.conf
+    skip:
+      - command: "systemd-detect-virt --container"
+        exit-status: 0

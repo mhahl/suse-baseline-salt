@@ -2,6 +2,10 @@
 
 {% from 'baseline/map.jinja' import running_in_container with context %}
 
+{% set fapolicyd = pillar.get('baseline:fapolicyd', {}) %}
+{% set enabled = fapolicyd.get('enabled', False) %}
+
+{% if enabled %}
 fapolicyd_package:
   pkg.installed:
     - name: fapolicyd
@@ -31,4 +35,10 @@ fapolicyd_service:
 fapolicyd_service_skipped:
   test.show_notification:
     - text: "Skipping fapolicyd service (running in container)"
+{% endif %}
+
+{% else %}
+fapolicyd_disabled:
+  test.show_notification:
+    - text: "fapolicyd is disabled in pillar (baseline:fapolicyd:enabled)"
 {% endif %}

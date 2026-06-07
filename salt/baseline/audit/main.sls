@@ -18,12 +18,18 @@ audit_rules:
     - require:
       - pkg: audit_package
 
+{% if not running_in_container %}
   cmd.run:
     - name: /sbin/augenrules --load
     - onchanges:
       - file: audit_rules
     - require:
       - file: audit_rules
+{% else %}
+augenrules_skipped_in_container:
+  test.show_notification:
+    - text: "Skipping augenrules --load (running in container - audit subsystem is limited)"
+{% endif %}
 
 {% if not running_in_container %}
 auditd_service:
