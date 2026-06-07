@@ -94,13 +94,14 @@ jobs:
           cat > /srv/pillar/top.sls << 'EOF'
           base:
             '*':
-              - baseline
+              # Baseline pillar data is split by category (no top-level "baseline" SLS exists)
               - baseline.system
               - baseline.hardening
               - baseline.network
               - monitoring.falco
               - monitoring.node_exporter
               - monitoring.vmagent
+              # CI overrides (enables monitoring modules for Goss coverage)
               - ci
           EOF
 
@@ -125,8 +126,21 @@ jobs:
       - name: Apply Salt states (baseline + monitoring)
         run: |
           set -euo pipefail
-          # Use --local for self-contained CI run. Warning level keeps output readable.
-          salt-call --local --log-level=warning state.apply baseline monitoring
+          # Use an explicit local-only config dir. This ensures we control file/pillar roots
+          # and run fully offline (avoids "not available on the salt master" errors from
+          # any system /etc/salt/minion that may point at a master).
+          mkdir -p /tmp/salt-ci/etc/salt
+          cat > /tmp/salt-ci/etc/salt/minion << 'MINIONCFG'
+          file_roots:
+            base:
+              - /srv/salt
+          pillar_roots:
+            base:
+              - /srv/pillar
+          MINIONCFG
+
+          # --local forces masterless operation; -c points at our config.
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.apply baseline monitoring
 
       - name: Run Goss (all tests)
         run: |
