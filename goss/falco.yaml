@@ -3,6 +3,7 @@
 package:
   falco:
     installed: true
+    title: "falco package is installed (when enabled)"
 
 file:
   /etc/falco/falco.yaml:
@@ -13,9 +14,11 @@ file:
     contains:
       - "http_output:"
       - "enabled: true"
+    title: "falco HTTP output is enabled in config"
 
 service:
   falco:
     enabled: true
     # In Goss container tests we intentionally do not start services
     running: false
+    title: "falco service is enabled (not started in container tests)"

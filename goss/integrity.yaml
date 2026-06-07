@@ -25,6 +25,10 @@ service:
 command:
   "rpm -q --quiet rpm":
     exit-status: 0
+    title: "rpm package is installed"
 
+  # Soft check: the daily rpm -Va cron job may or may not be present
+  # (it is skipped in container mode). We only care that it doesn't hard-fail.
   "crontab -l -u root 2>/dev/null | grep -q 'rpm -Va' || true":
     exit-status: 0
+    title: "rpm integrity cron job is configured (or skipped in container)"

@@ -23,9 +23,11 @@ command:
     exit-status: 0
     stdout:
       - "drop"
+    title: "firewalld default zone is drop (soft in container)"
 
   "sh -c 'systemd-detect-virt --container >/dev/null 2>&1 && echo ssh || firewall-cmd --list-services'":
     exit-status: 0
     # At minimum ssh should be allowed in most test scenarios
     stdout:
       - "ssh"
+    title: "ssh service is allowed by firewalld (soft in container)"

@@ -13,6 +13,7 @@ file:
     contains:
       - "SUSE Baseline - Kernel & Network Hardening"
       - "net.ipv4.conf.all.rp_filter"
+    title: "Kernel hardening sysctl config file is present"
 
 # Live kernel param checks are best-effort only (many params are restricted or
 # namespaced inside containers). The primary assertion is the config file above.
@@ -35,3 +36,4 @@ command:
     test \"\$(cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1)\" = 1
   '":
     exit-status: 0
+    title: "Live kernel hardening parameters are set (best-effort; skipped in containers)"

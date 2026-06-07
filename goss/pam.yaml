@@ -3,6 +3,7 @@
 package:
   pam:
     installed: true
+    title: "pam packages are installed"
 
 file:
   /etc/security/faillock.conf:
@@ -12,6 +13,7 @@ file:
       - "deny ="
       - "unlock_time ="
       - "even_deny_root"
+    title: "faillock.conf has baseline hardening settings"
 
   /etc/security/pwquality.conf:
     exists: true
@@ -20,3 +22,4 @@ file:
       - "minlen ="
       - "minclass ="
       - "enforce_for_root"
+    title: "pwquality.conf has baseline password policy"

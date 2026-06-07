@@ -20,3 +20,4 @@ command:
     exit-status: 0
     stdout:
       - "/etc/sudoers.d/99-baseline: parsed OK"
+    title: "Baseline sudoers file is syntactically valid"

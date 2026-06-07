@@ -18,8 +18,10 @@ command:
     exit-status: 0
     stdout:
       - "/^6$/"   # At least several readonly variables
+    title: "Profile sets several readonly security variables"
 
   "bash -c 'source /etc/profile.d/99-baseline.sh; echo $HISTSIZE'":
     exit-status: 0
     stdout:
       - "100000"
+    title: "Profile sets HISTSIZE=100000"

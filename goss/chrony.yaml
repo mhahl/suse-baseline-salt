@@ -3,12 +3,14 @@
 package:
   chrony:
     installed: true
+    title: "chrony package is installed"
 
 service:
   chronyd:
     enabled: true
     # In Goss container tests we intentionally do not start services
     running: false
+    title: "chronyd service is enabled (not started in container tests)"
 
 file:
   /etc/chrony.conf:
@@ -18,3 +20,4 @@ file:
       - "server time1.google.com"
       - "rtcsync"
       - "minsources 3"
+    title: "chrony config has hardened NTP servers"

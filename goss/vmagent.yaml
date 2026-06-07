@@ -4,6 +4,7 @@ user:
   vmagent:
     exists: true
     home: /var/lib/vmagent
+    title: "vmagent system user exists"
 
 file:
   /usr/local/bin/vmagent:
@@ -11,6 +12,7 @@ file:
     mode: "0755"
     owner: root
     group: root
+    title: "vmagent binary is installed"
 
   /etc/vmagent/scrape.yml:
     exists: true
@@ -19,6 +21,7 @@ file:
     group: vmagent
     contains:
       - "job_name:"
+    title: "vmagent scrape config exists"
 
   /etc/systemd/system/vmagent.service:
     exists: true
@@ -28,9 +31,11 @@ file:
     contains:
       - "vmagent"
       - "remoteWrite.url"
+    title: "vmagent systemd unit file exists"
 
 service:
   vmagent:
     enabled: true
     # In Goss container tests we intentionally do not start services
     running: false
+    title: "vmagent service is enabled (not started in container tests)"

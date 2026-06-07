@@ -8,3 +8,4 @@ file:
     contains:
       - "It's a UNIX System!"
       - "I know this!"
+    title: "Baseline motd banner is installed"

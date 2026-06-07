@@ -3,6 +3,7 @@
 package:
   prometheus-node_exporter:
     installed: true
+    title: "prometheus-node_exporter package is installed (when enabled)"
 
 file:
   /etc/sysconfig/prometheus-node_exporter:
@@ -12,9 +13,11 @@ file:
     group: root
     contains:
       - "prometheus-node_exporter"
+    title: "node_exporter sysconfig file exists"
 
 service:
   prometheus-node_exporter:
     enabled: true
     # In Goss container tests we intentionally do not start services
     running: false
+    title: "node_exporter service is enabled (not started in container tests)"

@@ -3,6 +3,7 @@
 package:
   audit:
     installed: true
+    title: "audit package is installed"
 
 file:
   /etc/audit/rules.d/99-baseline.rules:
@@ -13,3 +14,4 @@ file:
       - "-w /etc/passwd -p wa -k identity"
       - "-w /etc/shadow -p wa -k identity"
       - "-w /etc/sudoers -p wa -k privilege_escalation"
+    title: "Baseline audit rules file is installed"
