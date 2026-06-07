@@ -76,12 +76,21 @@ jobs:
           set -euo pipefail
           mkdir -p /srv/salt /srv/pillar
 
-          # Symlink the repo content directly so state.apply baseline / monitoring works
-          ln -sfn "$PWD/salt/baseline"     /srv/salt/baseline
-          ln -sfn "$PWD/salt/monitoring"  /srv/salt/monitoring
+          # In container jobs (job-level `container:`), the checkout is bind-mounted into
+          # the container. $PWD is not always the workspace root when the shell starts.
+          # actions/checkout@v4 sets $GITHUB_WORKSPACE to the correct path inside the container.
+          SRC="${GITHUB_WORKSPACE:-$PWD}"
+          echo "Source directory for symlinks: $SRC"
+          # Make it obvious in logs if the source tree is not visible (common cause of "no matching sls")
+          ls -ld "$SRC" "$SRC/salt/baseline" "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls" 2>/dev/null || echo "WARNING: source tree not visible at expected path"
 
-          ln -sfn "$PWD/pillar/baseline"    /srv/pillar/baseline
-          ln -sfn "$PWD/pillar/monitoring"  /srv/pillar/monitoring
+          # Symlink the repo content so state.sls baseline / monitoring can find the SLSes
+          # under the file_roots we configure below.
+          ln -sfn "$SRC/salt/baseline"     /srv/salt/baseline
+          ln -sfn "$SRC/salt/monitoring"  /srv/salt/monitoring
+
+          ln -sfn "$SRC/pillar/baseline"    /srv/pillar/baseline
+          ln -sfn "$SRC/pillar/monitoring"  /srv/pillar/monitoring
 
           # Minimal top files so highstate / direct apply works inside the test container
           cat > /srv/salt/top.sls << 'EOF'
@@ -126,9 +135,6 @@ jobs:
       - name: Apply Salt states (baseline + monitoring)
         run: |
           set -euo pipefail
-          # Use an explicit local-only config dir. This ensures we control file/pillar roots
-          # and run fully offline (avoids "not available on the salt master" errors from
-          # any system /etc/salt/minion that may point at a master).
           mkdir -p /tmp/salt-ci/etc/salt
           cat > /tmp/salt-ci/etc/salt/minion << 'MINIONCFG'
           file_roots:
@@ -139,11 +145,11 @@ jobs:
               - /srv/pillar
           MINIONCFG
 
-          # --local forces masterless operation; -c points at our config.
-          # Apply sequentially (one SLS list per invocation). Using a single
-          # state.sls call with "baseline,monitoring" would also work, but separate
-          # calls produce clearer per-state output and avoid any CLI arg parsing
-          # differences across Salt versions.
+          echo "SLS roots visible to Salt (under configured file_roots):"
+          find /srv/salt -name 'init.sls' | sort || true
+          echo "file_roots from this config:"
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning config.get file_roots || true
+
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring
 
@@ -153,20 +159,3 @@ jobs:
           # Goss files contain skip rules that trigger inside containers
           # (kernel params, firewalld runtime commands, etc.).
           goss --gossfile goss/goss.yaml validate --format tap
-
-      - name: Run individual component Goss targets (for visibility)
-        run: |
-          set +e
-          echo "=== make goss-profile ==="
-          make goss-profile
-          echo "=== make goss-chrony ==="
-          make goss-chrony
-          echo "=== make goss-audit ==="
-          make goss-audit
-          echo "=== make goss-falco ==="
-          make goss-falco
-          echo "=== make goss-vmagent ==="
-          make goss-vmagent
-          echo "=== make goss-node_exporter ==="
-          make goss-node_exporter || true
-          echo "Component runs complete."
