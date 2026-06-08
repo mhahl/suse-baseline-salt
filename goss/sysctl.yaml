@@ -20,20 +20,25 @@ file:
 # We use a single consolidated command (with inline container detection) to avoid
 # one Goss check per parameter and the `skip:` list syntax under `command:`
 # resources (which triggers "cannot unmarshal !!seq into bool" in Goss v0.4.9).
+#
+# The command key uses explicit `? |` / `:` YAML syntax because the script is
+# multi-line; plain double-quoted keys spanning lines + internal quotes easily
+# produce "mapping values are not allowed in this context" or escape errors.
 command:
-  "sh -c '
-    if systemd-detect-virt --container >/dev/null 2>&1; then
-      exit 0
-    fi
-    set -e
-    test \"$(cat /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || echo 1)\" = 1
-    test \"$(cat /proc/sys/net/ipv4/conf/default/rp_filter 2>/dev/null || echo 1)\" = 1
-    test \"$(cat /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null || echo 1)\" = 1
-    test \"$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)\" = 0
-    test \"$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null || echo 1)\" = 1
-    test \"$(cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo 2)\" = 2
-    test \"$(cat /proc/sys/fs/protected_hardlinks 2>/dev/null || echo 1)\" = 1
-    test \"$(cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1)\" = 1
-  '":
+  ? |
+    sh -c '
+      if systemd-detect-virt --container >/dev/null 2>&1; then
+        exit 0
+      fi
+      set -e
+      test "$(cat /proc/sys/net/ipv4/conf/all/rp_filter 2>/dev/null || echo 1)" = 1
+      test "$(cat /proc/sys/net/ipv4/conf/default/rp_filter 2>/dev/null || echo 1)" = 1
+      test "$(cat /proc/sys/net/ipv4/tcp_syncookies 2>/dev/null || echo 1)" = 1
+      test "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null || echo 0)" = 0
+      test "$(cat /proc/sys/kernel/dmesg_restrict 2>/dev/null || echo 1)" = 1
+      test "$(cat /proc/sys/kernel/kptr_restrict 2>/dev/null || echo 2)" = 2
+      test "$(cat /proc/sys/fs/protected_hardlinks 2>/dev/null || echo 1)" = 1
+      test "$(cat /proc/sys/fs/protected_symlinks 2>/dev/null || echo 1)" = 1
+  :
     exit-status: 0
     title: "Live kernel hardening parameters are set (best-effort; skipped in containers)"
