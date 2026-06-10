@@ -1,0 +1,95 @@
+name: "Goss / Baseline"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "goss/banner.yaml"
+      - "goss/chrony.yaml"
+      - "goss/profile.yaml"
+      - "goss/systemd-resolved.yaml"
+      - "goss/updates.yaml"
+      - "goss/usb.yaml"
+      - "goss/baseline.yaml"
+      - "goss/goss.yaml"
+      - "salt/baseline/**"
+      - "pillar/baseline.sls"
+      - "pillar/top.sls"
+      - "Makefile"
+      - ".forgejo/workflows/baseline.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "goss/banner.yaml"
+      - "goss/chrony.yaml"
+      - "goss/profile.yaml"
+      - "goss/systemd-resolved.yaml"
+      - "goss/updates.yaml"
+      - "goss/usb.yaml"
+      - "goss/baseline.yaml"
+      - "goss/goss.yaml"
+      - "salt/baseline/**"
+      - "pillar/baseline.sls"
+      - "pillar/top.sls"
+      - "Makefile"
+      - ".forgejo/workflows/baseline.yml"
+
+jobs:
+  goss-baseline:
+    runs-on: opensuse-tumbleweed
+    container:
+      image: opensuse/tumbleweed:latest
+      options: --privileged
+
+    steps:
+      - name: Install Node.js (required for JS actions)
+        run: |
+          zypper refresh
+          zypper --non-interactive install -y nodejs npm
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system packages (SUSE)
+        run: |
+          set -euo pipefail
+          zypper --non-interactive refresh
+          zypper --non-interactive install --no-recommends \
+            salt-minion make curl git ca-certificates \
+            chrony systemd-resolved systemd
+
+      - name: Install Goss
+        run: |
+          set -euo pipefail
+          GOSS_VERSION="v0.4.9"
+          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64" \
+            -o /usr/local/bin/goss
+          chmod +x /usr/local/bin/goss
+          goss --version
+
+      - name: Prepare minion config
+        run: |
+          set -euo pipefail
+          for cand in "$GITHUB_WORKSPACE" "$PWD" /workspace /home/runner/_work/*/* /__w/*/* /root; do
+            [ -d "$cand/salt/baseline" ] && { SRC=$cand; break; }
+          done
+          if [ -z "${SRC:-}" ]; then
+            found=$(find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -1 || true)
+            [ -n "$found" ] && SRC=$(dirname "$(dirname "$found")")
+          fi
+          [ -d "${SRC:-}/salt/baseline" ] || { echo "FATAL: source not found"; exit 1; }
+          echo "SRC=$SRC" >> $GITHUB_ENV
+
+      - name: Apply baseline states
+        run: |
+          set -euo pipefail
+          salt-call --local \
+            --file-root="$SRC/salt" \
+            --pillar-root="$SRC/pillar" \
+            --log-level=warning \
+            state.sls baseline || echo "baseline apply completed. Continuing."
+
+      - name: Run Goss (baseline)
+        run: |
+          set -euo pipefail
+          goss --gossfile goss/baseline.yaml validate --format tap

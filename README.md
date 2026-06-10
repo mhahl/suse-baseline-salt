@@ -95,9 +95,12 @@ See the [Makefile](Makefile) for more options.
 
 ### CI
 
-- **Goss tests** run in a container on `opensuse-tumbleweed` runners on push/PR to relevant paths.
+Goss tests run in containers on `opensuse-tumbleweed` runners:
 
-See [`.forgejo/workflows/goss.yml`](.forgejo/workflows/goss.yml).
+- **Baseline** tests: [`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)
+- **Monitoring** tests: [`.forgejo/workflows/monitoring.yml`](.forgejo/workflows/monitoring.yml)
+
+Workflows are triggered on push/PR to relevant paths (states, pillar, and their corresponding Goss test files). They run the appropriate subset of tests in isolation.
 
 (Linting and other checks can be added to the Forgejo workflows as needed.)
 

@@ -1,32 +1,41 @@
-name: goss
+name: "Goss / Monitoring"
 
 on:
   push:
     branches: [main]
     paths:
-      - "goss/**"
-      - "salt/**"
-      - "pillar/**"
+      - "goss/falco.yaml"
+      - "goss/node_exporter.yaml"
+      - "goss/vmagent.yaml"
+      - "goss/monitoring.yaml"
+      - "goss/goss.yaml"
+      - "salt/monitoring/**"
+      - "pillar/monitoring/**"
+      - "pillar/top.sls"
       - "Makefile"
-      - ".forgejo/workflows/goss.yml"
+      - ".forgejo/workflows/monitoring.yml"
   pull_request:
     branches: [main]
     paths:
-      - "goss/**"
-      - "salt/**"
-      - "pillar/**"
+      - "goss/falco.yaml"
+      - "goss/node_exporter.yaml"
+      - "goss/vmagent.yaml"
+      - "goss/monitoring.yaml"
+      - "goss/goss.yaml"
+      - "salt/monitoring/**"
+      - "pillar/monitoring/**"
+      - "pillar/top.sls"
       - "Makefile"
-      - ".forgejo/workflows/goss.yml"
+      - ".forgejo/workflows/monitoring.yml"
 
 jobs:
-  goss:
+  goss-monitoring:
     runs-on: opensuse-tumbleweed
     container:
       image: opensuse/tumbleweed:latest
       options: --privileged
 
     steps:
-
       - name: Install Node.js (required for JS actions)
         run: |
           zypper refresh
@@ -80,7 +89,7 @@ jobs:
             --log-level=warning \
             state.sls monitoring || echo "monitoring apply completed. Continuing."
 
-      - name: Run Goss (all tests)
+      - name: Run Goss (monitoring)
         run: |
           set -euo pipefail
-          goss --gossfile goss/goss.yaml validate --format tap
+          goss --gossfile goss/monitoring.yaml validate --format tap

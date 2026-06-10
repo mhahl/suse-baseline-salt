@@ -1,0 +1,4 @@
+gossfile:
+  falco.yaml: {}
+  node_exporter.yaml: {}
+  vmagent.yaml: {}

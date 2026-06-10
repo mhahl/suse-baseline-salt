@@ -1,0 +1,7 @@
+gossfile:
+  banner.yaml: {}
+  chrony.yaml: {}
+  profile.yaml: {}
+  systemd-resolved.yaml: {}
+  updates.yaml: {}
+  usb.yaml: {}

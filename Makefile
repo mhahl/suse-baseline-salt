@@ -32,7 +32,7 @@ help:
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
 	@echo "  goss                Run all Goss tests (requires goss + target system state)"
-	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-falco"
+	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-falco, make goss-baseline, make goss-monitoring"
 	@echo "  install-goss        Download a local goss binary to ./goss"
 	@echo "  clean               Remove local goss binary"
 	@echo
