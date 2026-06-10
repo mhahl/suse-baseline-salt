@@ -1,28 +1,55 @@
-rules_file:
-  - /etc/falco/falco_rules.yaml
-  - /etc/falco/falco_rules.local.yaml
-  - /etc/falco/rules.d
-
 json_output: true
-json_include_output_property: true
+   json_include_output_property: true
+   json_include_tags_property: true
 
-http_output:
-  enabled: true
-  url: {{ falco.get('http_output_url', 'https://falco.sigaint.au') }}
+   grpc_output:
+     enabled: true
 
-logging:
-  enabled: true
-  level: info
-  destination: /var/log/falco/falco.log
+   http_output:
+     enabled: true
+     url: {{ falco.get('http_output_url', 'https://falco.sigaint.au') }}
+     insecure: true
 
-stdout_output:
-  enabled: false
+   log_stderr: true
+   log_syslog: true
+   log_level: info
 
-syslog_output:
-  enabled: false
+   stdout_output:
+     enabled: true
 
-file_output:
-  enabled: false
+   syslog_output:
+     enabled: true
 
-program_output:
-  enabled: false
+   # Load the container plugin (required for many default rules)
+   plugins:
+     - name: container
+       library_path: libcontainer.so
+       init_config: ""
+       open_params: ""
+
+   # Rules files (default + custom directory)
+   rules_files:
+     - /etc/falco/falco_rules.yaml
+     - /etc/falco/falco_rules.local.yaml
+     - /etc/falco/rules.d
+
+
+   watch_config_files: true
+   engine:
+     kind: modern_ebpf
+
+     modern_ebpf:
+       buf_size_preset: 12
+
+   priority: warning
+   output_timeout: 2000
+
+   # Prometheus metrics exposure
+   webserver:
+     enabled: true
+     listen_port: 8765
+     prometheus_metrics_enabled: true
+
+   metrics:
+     enabled: true
+     interval: "30s"

@@ -1,0 +1,33 @@
+# ==============================================================================
+# RULE: SUDO CHROOT PRIVILEGE ESCALATION (CVE-2025-32463)
+# ==============================================================================
+- rule: Sudo Chroot Privilege Escalation Attempt (CVE-2025-32463)
+  desc: >
+    Detects the use of the sudo chroot (-R) option. This option is vulnerable to 
+    local privilege escalation in sudo versions 1.9.14-1.9.17.
+  condition: >
+    spawned_process and 
+    proc.name = "sudo" and 
+    (proc.args contains "-R" or proc.args contains "--chroot")
+  output: >
+    Critical Sudo Exploitation Attempt (CVE-2025-32463) detected: sudo executed with chroot flag 
+    (user=%user.name uid=%user.uid command=%proc.cmdline)
+  priority: CRITICAL
+  tags: [cve, cve_2025_32463, privilege_escalation, mitre_privilege_escalation]
+
+# ==============================================================================
+# RULE: SUSPICIOUS NSSWITCH.CONF CREATION
+# ==============================================================================
+- rule: Suspicious nsswitch.conf Creation (Potential CVE-2025-32463 Prep)
+  desc: >
+    Detects the creation or modification of nsswitch.conf outside of /etc. 
+    This is a common prerequisite step for exploiting CVE-2025-32463.
+  condition: >
+    open_write and 
+    fd.filename endswith "nsswitch.conf" and 
+    not fd.directory = "/etc"
+  output: >
+    Suspicious nsswitch.conf created in non-standard location 
+    (file=%fd.name user=%user.name command=%proc.cmdline)
+  priority: CRITICAL
+  tags: [cve, cve_2025_32463, persistence]

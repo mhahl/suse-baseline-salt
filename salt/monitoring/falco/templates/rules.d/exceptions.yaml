@@ -1,0 +1,204 @@
+# ==============================================================================
+# RULE: WRITE BELOW ROOT
+# ==============================================================================
+- rule: Write below root
+  exceptions:
+    # [Component: Falcoctl]
+    # Allow falcoctl to update signature verification databases in /root.
+    - name: falcoctl_sigstore_update
+      fields: [proc.exe, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/bin/falcoctl", "/root/.sigstore/"]
+  override:
+    exceptions: append
+
+# ==============================================================================
+# RULE: WRITE BELOW ETC
+# Fixed: Merged "Write below /etc" into the standard "Write below etc"
+# ==============================================================================
+- rule: Write below etc
+  exceptions:
+    # [Component: Directory Server]
+    # Allow ns-slapd to write to its specific configuration directory.
+    - name: proc_slapd_dirsrv_only
+      fields: [proc.exe, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/sbin/ns-slapd", "/etc/dirsrv"]
+
+    # [Component: Podman]
+    # Allow Podman to manage container locks and configurations in /etc.
+    - name: podman_write_etc
+      fields: [proc.exe, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/bin/podman", "/etc/"]
+
+    # [Component: Systemd]
+    # Allow systemd-executor to manage the password lock file (normal deserialization behavior).
+    # Note: Using proc.exepath because proc.exe might be dynamic (e.g. "16")
+    - name: systemd_executor_pwd_lock
+      fields: [proc.exepath, fd.name]
+      comps: [=, =]
+      values:
+        - ["/usr/lib/systemd/systemd-executor", "/etc/.pwd.lock"]
+
+    # [Component: CUPS]
+    # Allow the print daemon to update subscriptions, printers, and classes.
+    # We use 'startswith /etc/cups/' to cover subscriptions.conf.N, printers.conf, etc.
+    - name: cupsd_write_config
+      fields: [proc.exepath, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/sbin/cupsd", "/etc/cups/"]
+
+    # [Component: Certmonger]
+    # Allow certmonger agents to update NSS databases (keys/certs) in /etc/pki.
+    # Uses proc.exepath because proc.name is often truncated (e.g. "dogtag-ipa-rene").
+    - name: certmonger_update_pki
+      fields: [proc.exepath, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/libexec/certmonger/dogtag-ipa-renew-agent-submit", "/etc/pki/nssdb/"]
+  override:
+    exceptions: append
+
+# ==============================================================================
+# RULE: WRITE BELOW BINARY DIR
+# ==============================================================================
+- rule: Write below binary dir
+  exceptions:
+    # [Component: Podman]
+    # Allow Podman to write to binary directories (e.g. setting up CNI plugins or entrypoints).
+    - name: podman_write_binary
+      fields: [proc.exe]
+      comps: [=]
+      values:
+        - ["/usr/bin/podman"]
+  override:
+    exceptions: append
+
+
+# ==============================================================================
+# RULE: RUN SHELL UNTRUSTED
+# ==============================================================================
+- rule: Run shell untrusted
+  exceptions:
+    # [Component: Podman]
+    # Allow Podman to spawn shells (common during container startup/exec).
+    - name: podman_spawn_shell
+      fields: [proc.exe]
+      comps: [=]
+      values:
+        - ["/usr/bin/podman"]
+  override:
+    exceptions: append
+
+
+# ==============================================================================
+# RULE: READ SENSITIVE FILE UNTRUSTED
+# ==============================================================================
+- rule: Read sensitive file untrusted
+  exceptions:
+    # [Component: Systemd]
+    - name: systemd_sensitive_reads
+      fields: [proc.exe, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/usr/lib/systemd/systemd-executor", "/etc/pam.d/"]
+        - ["/usr/lib/systemd/systemd-userwork", "/etc/shadow"]
+        - ["/usr/lib/systemd/systemd-executor", "/etc/shadow"]
+
+    # [Component: Osquery/Orbit]
+    - name: osquery_agent_read_all
+      fields: [proc.name]
+      comps: [=]
+      values:
+        - ["osqueryd"]
+
+    # [Component: ThinLinc]
+    # Allow ThinLinc PAM helper to read authentication configs.
+    - name: thinlinc_pam_read
+      fields: [proc.exepath, fd.name]
+      comps: [=, startswith]
+      values:
+        - ["/opt/thinlinc/libexec/tl-pamapp", "/etc/pam.d/"]
+  override:
+    exceptions: append
+
+# ==============================================================================
+# RULE: EXECUTING BINARY NOT PART OF BASE IMAGE
+# ==============================================================================
+- rule: Drop and execute new binary in container
+  exceptions:
+    # [Component: Flaresolverr]
+    # Allow chromedriver to run, even if it resides in an upper filesystem layer.
+    # We scope this strictly to the flaresolverr container image.
+    - name: flaresolverr_chromedriver
+      fields: [proc.exe, container.image.repository]
+      comps: [=, endswith]
+      values:
+        - ["/app/chromedriver", "flaresolverr/flaresolverr"]
+  override:
+    exceptions: append
+
+# ==============================================================================
+# RULE: RPM DATABASE OPEN WRITING
+# ==============================================================================
+- rule: Write below rpm database
+  exceptions:
+    # [Component: Osquery/Orbit]
+    # Allow osqueryd to write to RPM SQLite artifacts (WAL/SHM files).
+    # This is required for osquery to query installed packages on modern Linux.
+    # We use 'endswith /osqueryd' to match the Orbit path:
+    # /opt/orbit/bin/osqueryd/linux/stable/osqueryd
+    - name: osquery_rpmdb_write
+      fields: [proc.exepath, fd.name]
+      comps: [endswith, startswith]
+      values:
+        - ["/osqueryd", "/var/lib/rpm/"]
+  override:
+    exceptions: append
+
+# ==============================================================================
+# RULE: READ SSH INFORMATION
+# ==============================================================================
+- rule: Read ssh information
+  exceptions:
+    # [Component: Systemd]
+    # Allow systemd-tmpfiles to scan SSH directories during cleanup/maintenance.
+    # It often checks permissions or ages of files in /root/.ssh.
+    - name: systemd_tmpfiles_ssh
+      fields: [proc.exepath, fd.name]
+      comps: [=, startswith]
+      values:
+        - [ "/usr/bin/systemd-tmpfiles", "/root/.ssh" ]
+
+    # [Component: OpenSSH]
+    # Allow the new 'sshd-session' binary (modern OpenSSH) to read user keys
+    - name: sshd_session_reader
+      fields: [proc.exepath]
+      comps: [=]
+      values:
+        - ["/usr/libexec/openssh/sshd-session"]
+
+  override:
+    exceptions: append
+
+- rule: Modify binary dirs
+  exceptions:
+    # [Component: Package Managers]
+    # Allow DNF/RPM to update system binaries (Path specific)
+    - name: package_manager_update_paths
+      fields: [proc.exepath]
+      comps: [in]
+      values:
+        - ["/usr/bin/dnf"]
+        - ["/usr/bin/dnf5"]
+        - ["/usr/bin/rpm"]
+        - ["/usr/bin/yum"]
+        - ["/usr/bin/microdnf"]
+
+  override:
+    exceptions: append

@@ -18,7 +18,7 @@ falco_repo:
 
 falco_repo_refresh:
   cmd.run:
-    - name: zypper --gpg-auto-import-keys -n refresh falcosecurity
+    - name: zypper --gpg-auto-import-keys -n refresh falcosecurity-rpm
     - require:
       - file: falco_repo
 
@@ -27,6 +27,7 @@ falco_package:
     - name: falco
     - env:
         FALCO_FRONTEND: noninteractive
+        FALCO_DRIVER_CHOICE: modern_ebpf
     - require:
       - cmd: falco_repo_refresh
 
@@ -43,14 +44,28 @@ falco_config:
     - require:
       - pkg: falco_package
 
+falco_rules_d:
+  file.recurse:
+    - name: /etc/falco/rules.d
+    - source: salt://monitoring/falco/templates/rules.d
+    - user: root
+    - group: root
+    - dir_mode: '0755'
+    - file_mode: '0644'
+    - clean: true
+    - require:
+      - pkg: falco_package
+
 falco_service:
   service.running:
     - name: falco
     - enable: True
     - watch:
       - file: falco_config
+      - file: falco_rules_d
     - require:
       - pkg: falco_package
+      - file: falco_rules_d
 
 {% else %}
 

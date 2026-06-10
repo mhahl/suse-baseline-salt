@@ -15,3 +15,17 @@ file:
       - "http_output:"
       - "enabled: true"
     title: "falco HTTP output is enabled in config"
+
+  /etc/falco/rules.d:
+    exists: true
+    filetype: directory
+    owner: root
+    group: root
+    title: "falco custom rules directory is deployed"
+
+  /etc/falco/rules.d/detections.yaml:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    title: "falco detections rules are deployed"

