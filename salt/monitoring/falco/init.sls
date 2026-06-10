@@ -56,6 +56,24 @@ falco_rules_d:
     - require:
       - pkg: falco_package
 
+{# Additional rules downloaded from remote URLs. Note: if dest is inside /etc/falco/rules.d, the falco_rules_d recurse with clean:true may remove it. #}
+{% set additional_rules = falco.get('additional_rules', []) %}
+{% for item in additional_rules %}
+falco_additional_rule_{{ loop.index0 }}:
+  file.managed:
+    - name: {{ item.dest }}
+    - source: {{ item.url }}
+    - skip_verify: true
+    - user: root
+    - group: root
+    - mode: '0644'
+    - makedirs: true
+    - require:
+      - pkg: falco_package
+    - watch_in:
+      - service: falco_service
+{% endfor %}
+
 falco_service:
   service.running:
     - name: falco

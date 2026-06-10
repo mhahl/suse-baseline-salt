@@ -27,11 +27,14 @@ plugins:
     init_config: ""
     open_params: ""
 
-# Rules files (default + custom directory)
+# Rules files (default + custom directory + additional remote rules)
 rules_files:
   - /etc/falco/falco_rules.yaml
   - /etc/falco/falco_rules.local.yaml
   - /etc/falco/rules.d
+{%- for r in falco.get('additional_rules', []) %}
+  - {{ r.dest }}
+{%- endfor %}
 
 
 watch_config_files: true
