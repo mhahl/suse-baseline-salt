@@ -31,7 +31,15 @@ file:
     contains:
       - "vmagent"
       - "remoteWrite.url"
+      - "remoteWrite.tmpDataPath"
     title: "vmagent systemd unit file exists"
+
+  /var/lib/vmagent/vmagent-remotewrite-data:
+    exists: true
+    filetype: directory
+    owner: vmagent
+    group: vmagent
+    title: "vmagent remote write data directory exists with correct ownership"
 
 service:
   vmagent:

@@ -14,6 +14,7 @@ vmagent_directories:
   file.directory:
     - names:
       - /var/lib/vmagent
+      - /var/lib/vmagent/vmagent-remotewrite-data
       - /etc/vmagent
     - user: vmagent
     - group: vmagent
@@ -84,6 +85,7 @@ vmagent_service:
     - require:
       - pkg: vmagent_package
       - file: vmagent_service_file
+      - file: vmagent_directories
 
 {% else %}
 
