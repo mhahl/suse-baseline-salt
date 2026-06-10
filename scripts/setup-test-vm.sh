@@ -113,42 +113,39 @@ EOF
     echo "    Created /srv/salt/top.sls for highstate"
 fi
 
-# For reliable "local" usage (especially on dev machines or when system minion config
-# doesn't point at /srv), we recommend using explicit roots on the command line.
-# This avoids depending on /etc/salt/minion or /srv being in the default file_roots.
-
 # final instructions
 echo
 echo "==================================================================="
 echo "  SUSE VM setup complete!"
 echo "==================================================================="
 echo
-echo "Next steps:"
+echo "Next steps (using the Makefile - recommended):"
 echo
-echo "  1. Apply the baseline (local/masterless mode):"
-echo "     # Recommended (works reliably even on dev machines without system /srv config):"
-echo "     salt-call --local \\"
-echo "       --file-root=\"$REPO_ROOT/salt\" \\"
-echo "       --pillar-root=\"$REPO_ROOT/pillar\" \\"
-echo "       state.apply baseline --log-level=info"
+echo "  1. (Optional) Ensure full /srv symlinks are in place:"
+echo "     sudo make links"
 echo
-echo "     # Alternative if you want to use the /srv symlinks created above:"
-echo "     salt-call --local state.apply baseline --log-level=info"
+echo "  2. Apply states (local/masterless mode):"
+echo "     sudo make apply                        # applies 'baseline'"
+echo "     sudo make apply MODULE=monitoring.falco"
+echo "     sudo make apply MODULE=monitoring      # all monitoring states"
 echo
-echo "  2. Run all Goss tests:"
+echo "     # Or use the full salt-call target for more control:"
+echo "     sudo make salt-call SALT_ARGS='state.apply baseline test=True'"
+echo
+echo "  3. Run Goss tests:"
 echo "     make goss"
-echo
-echo "  3. Run tests for a specific component:"
+echo "     make goss-falco"
 echo "     make goss-chrony"
-echo "     make goss-profile"
-echo "     make goss-systemd-resolved"
-echo "     make goss-usb"
+echo "     ..."
 echo
-echo "  4. (Optional) Install goss via make if you prefer a local binary:"
+echo "  4. (Optional) Install a local goss binary:"
 echo "     make install-goss"
 echo
 echo "Repository location: $REPO_ROOT"
-echo "(The explicit --file-root/--pillar-root command above is recommended for reliable 'local' runs.)"
+echo
+echo "The Makefile targets (links / apply / salt-call) are the preferred way"
+echo "to work with Salt locally. They use the correct --file-root/--pillar-root"
+echo "automatically and handle sudo escalation when needed."
 echo
 echo "Happy testing!"
 echo "==================================================================="
