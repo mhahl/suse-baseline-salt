@@ -26,19 +26,18 @@ plugins:
 
 # Rules files (default + custom directory + additional remote rules)
 rules_files:
-  - /etc/falco/falco_rules.yaml
-  - /etc/falco/falco_rules.local.yaml
-  - /etc/falco/rules.d
 {%- for r in falco.get('additional_rules', []) %}
   - {{ r.dest }}
 {%- endfor %}
-
+  - /etc/falco/falco_rules.yaml
+  - /etc/falco/falco_rules.local.yaml
+  - /etc/falco/rules.d
 
 watch_config_files: true
 engine:
   kind: modern_ebpf
   modern_ebpf:
-    buf_size_preset: 12
+    buf_size_preset: 6
 
 priority: warning
 output_timeout: 2000
