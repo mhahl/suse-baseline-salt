@@ -3,7 +3,7 @@
 
 monitoring:
   falco:
-    enabled: false
+    enabled: true
 
     # Where Falco should send events (Falco HTTP output or Falcosidekick)
     http_output_url: "https://falco.sigaint.au"

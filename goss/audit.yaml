@@ -14,4 +14,4 @@ file:
       - "-w /etc/passwd -p wa -k identity"
       - "-w /etc/shadow -p wa -k identity"
       - "-w /etc/sudoers -p wa -k privilege_escalation"
-    title: "Baseline audit rules file is installed"
+    title: "audit rules file is installed"

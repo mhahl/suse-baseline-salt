@@ -3,7 +3,7 @@
 
 monitoring:
   node_exporter:
-    enabled: false
+    enabled: true
 
     # Address node_exporter will listen on
     listen_address: ":9100"

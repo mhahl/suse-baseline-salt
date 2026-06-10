@@ -3,7 +3,7 @@
 
 monitoring:
   vmagent:
-    enabled: false
+    enabled: true
 
     # Remote VictoriaMetrics / vminsert write endpoint
     remote_write_url: "https://vm.example.com/api/v1/write"
