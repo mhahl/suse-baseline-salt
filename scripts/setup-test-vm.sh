@@ -74,7 +74,7 @@ else
     echo "==> Goss already installed: $(goss --version 2>/dev/null || echo 'unknown version')"
 fi
 
-# prepare salt dirs
+# prepare salt dirs (for traditional /srv usage on a full minion)
 echo "==> Preparing Salt file roots..."
 
 mkdir -p /srv/salt /srv/pillar
@@ -113,6 +113,10 @@ EOF
     echo "    Created /srv/salt/top.sls for highstate"
 fi
 
+# For reliable "local" usage (especially on dev machines or when system minion config
+# doesn't point at /srv), we recommend using explicit roots on the command line.
+# This avoids depending on /etc/salt/minion or /srv being in the default file_roots.
+
 # final instructions
 echo
 echo "==================================================================="
@@ -121,7 +125,14 @@ echo "==================================================================="
 echo
 echo "Next steps:"
 echo
-echo "  1. Apply the baseline (local mode):"
+echo "  1. Apply the baseline (local/masterless mode):"
+echo "     # Recommended (works reliably even on dev machines without system /srv config):"
+echo "     salt-call --local \\"
+echo "       --file-root=\"$REPO_ROOT/salt\" \\"
+echo "       --pillar-root=\"$REPO_ROOT/pillar\" \\"
+echo "       state.apply baseline --log-level=info"
+echo
+echo "     # Alternative if you want to use the /srv symlinks created above:"
 echo "     salt-call --local state.apply baseline --log-level=info"
 echo
 echo "  2. Run all Goss tests:"
@@ -136,7 +147,8 @@ echo
 echo "  4. (Optional) Install goss via make if you prefer a local binary:"
 echo "     make install-goss"
 echo
-echo "Repository location on this VM: $REPO_ROOT"
+echo "Repository location: $REPO_ROOT"
+echo "(The explicit --file-root/--pillar-root command above is recommended for reliable 'local' runs.)"
 echo
 echo "Happy testing!"
 echo "==================================================================="
