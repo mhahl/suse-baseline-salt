@@ -53,99 +53,32 @@ jobs:
           chmod +x /usr/local/bin/goss
           goss --version
 
-      - name: Prepare Salt file roots and pillar (with CI overrides)
+      - name: Prepare minion config
         run: |
           set -euo pipefail
-          mkdir -p /srv/salt /srv/pillar
-
-          SRC=""
-          if command -v git >/dev/null 2>&1; then
-            SRC="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-          fi
-          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
+          for cand in "$GITHUB_WORKSPACE" "$PWD" /workspace /home/runner/_work/*/* /__w/*/* /root; do
+            [ -d "$cand/salt/baseline" ] && { SRC=$cand; break; }
+          done
+          if [ -z "${SRC:-}" ]; then
             found=$(find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -1 || true)
-            if [ -n "$found" ]; then
-              SRC=$(dirname "$(dirname "$found")")
-            fi
+            [ -n "$found" ] && SRC=$(dirname "$(dirname "$found")")
           fi
-          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
-            for cand in "$GITHUB_WORKSPACE" "$PWD" /workspace /home/runner/_work/*/* /__w/*/* /root; do
-              if [ -d "$cand/salt/baseline" ]; then
-                SRC="$cand"
-                break
-              fi
-            done
-          fi
-
-          if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
-            echo "FATAL: Could not locate the checked-out source containing salt/baseline/"
-            echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<unset>}"
-            echo "PWD=$PWD"
-            echo "Some top-level dirs:"
-            ls -1d / /workspace /home/runner /__w /root 2>/dev/null || true
-            echo "Any baseline/ dirs found anywhere:"
-            find / -maxdepth 7 -type d -name baseline 2>/dev/null | head -20 || true
-            exit 1
-          fi
-
-          ls -ld "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls" 2>/dev/null || true
-          cat > /srv/salt/top.sls << 'EOF'
-          base:
-            '*':
-              - baseline.init
-              - monitoring.init
-          EOF
-
-          cat > /srv/pillar/top.sls << 'EOF'
-          base:
-            '*':
-              - baseline
-              - monitoring.falco
-              - monitoring.node_exporter
-              - monitoring.vmagent
-              - ci
-          EOF
-
-          cat > /srv/pillar/ci.sls << 'EOF'
-          monitoring:
-            falco:
-              enabled: true
-            node_exporter:
-              enabled: true
-            vmagent:
-              enabled: true
-              remote_write_url: "http://127.0.0.1:8428/api/v1/write"
-              scrape_configs: |
-                - job_name: 'ci'
-                  static_configs:
-                    - targets: ['127.0.0.1:9100']
-          EOF
-
-          mkdir -p /tmp/salt-ci/etc/salt
-          cat > /tmp/salt-ci/etc/salt/minion << EOF
-          file_roots:
-            base:
-              - /srv/salt
-              - $SRC/salt
-          pillar_roots:
-            base:
-              - /srv/pillar
-              - $SRC/pillar
-          EOF
-
-          cat /tmp/salt-ci/etc/salt/minion
+          [ -d "${SRC:-}/salt/baseline" ] || { echo "FATAL: source not found"; exit 1; }
+          echo "SRC=$SRC" >> $GITHUB_ENV
 
       - name: Apply states
         run: |
           set -euo pipefail
-
-          find /srv/salt -name 'init.sls' | sort || true
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning config.get file_roots || true
-
-          find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -5 || true
-
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline || echo "baseline apply completed. Continuing."
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring || echo "monitoring apply completed. Continuing."
+          salt-call --local \
+            --file-root="$SRC/salt" \
+            --pillar-root="$SRC/pillar" \
+            --log-level=warning \
+            state.sls baseline || echo "baseline apply completed. Continuing."
+          salt-call --local \
+            --file-root="$SRC/salt" \
+            --pillar-root="$SRC/pillar" \
+            --log-level=warning \
+            state.sls monitoring || echo "monitoring apply completed. Continuing."
 
       - name: Run Goss (all tests)
         run: |

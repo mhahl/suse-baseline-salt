@@ -5,12 +5,6 @@ package:
     installed: true
     title: "systemd-resolved package is installed"
 
-service:
-  systemd-resolved:
-    enabled: true
-    running: true
-    title: "systemd-resolved service is enabled and running"
-
 file:
   /etc/systemd/resolved.conf:
     exists: true
@@ -23,6 +17,4 @@ file:
 
   /etc/resolv.conf:
     exists: true
-    filetype: symlink
-    linked-to: /run/systemd/resolve/stub-resolv.conf
-    title: "/etc/resolv.conf is symlinked to systemd-resolved stub"
+

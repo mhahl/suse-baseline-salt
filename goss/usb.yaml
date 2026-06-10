@@ -6,8 +6,3 @@ file:
     contains:
       - "blacklist usb-storage"
       - "blacklist uas"
-
-command:
-  "lsmod | grep -E 'usb_storage|uas' || true":
-    exit-status: 0
-    title: "usb-storage and uas modules are not loaded"
