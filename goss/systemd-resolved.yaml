@@ -26,7 +26,13 @@ file:
     exists: true
     filetype: symlink
     linked-to: /run/systemd/resolve/stub-resolv.conf
-    skip:
-      - command: "systemd-detect-virt --container"
-        exit-status: 0
+    title: "/etc/resolv.conf is symlinked to systemd-resolved stub"
+
+command:
+  # Container-aware wrapper for the resolv.conf symlink check.
+  # We avoid the `skip:` list syntax under file/command resources because
+  # Goss v0.4.9 cannot unmarshal a sequence into the (bool) skip field
+  # ("cannot unmarshal !!seq into bool").
+  "sh -c 'systemd-detect-virt --container >/dev/null 2>&1 && exit 0 || test -L /etc/resolv.conf && [ \"$(readlink /etc/resolv.conf)\" = \"/run/systemd/resolve/stub-resolv.conf\" ]'":
+    exit-status: 0
     title: "/etc/resolv.conf is symlinked to systemd-resolved stub (skipped in container)"
