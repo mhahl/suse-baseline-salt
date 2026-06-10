@@ -3,20 +3,32 @@
 
 {% if enabled %}
 
+falco_gpg_key:
+  cmd.run:
+    - name: rpm --import https://falco.org/repo/falcosecurity-packages.asc
+    - unless: rpm -qa | grep -q 'gpg-pubkey.*falcosecurity'
+
 falco_repo:
-  pkgrepo.managed:
-    - name: falco
-    - humanname: Falco
-    - baseurl: https://download.falco.org/packages/rpm
-    - gpgkey: https://falco.org/repo/falcosecurity-3672BA8F.asc
-    - gpgcheck: 1
-    - enabled: 1
+  file.managed:
+    - name: /etc/zypp/repos.d/falcosecurity.repo
+    - source: https://falco.org/repo/falcosecurity-rpm.repo
+    - skip_verify: true
+    - require:
+      - cmd: falco_gpg_key
+
+falco_repo_refresh:
+  cmd.run:
+    - name: zypper --gpg-auto-import-keys -n refresh falcosecurity
+    - require:
+      - file: falco_repo
 
 falco_package:
   pkg.installed:
     - name: falco
+    - env:
+        FALCO_FRONTEND: noninteractive
     - require:
-      - pkgrepo: falco_repo
+      - cmd: falco_repo_refresh
 
 falco_config:
   file.managed:

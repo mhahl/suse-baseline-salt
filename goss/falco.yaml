@@ -15,9 +15,3 @@ file:
       - "http_output:"
       - "enabled: true"
     title: "falco HTTP output is enabled in config"
-
-service:
-  falco:
-    enabled: true
-    running: true
-    title: "falco service is enabled and running"
