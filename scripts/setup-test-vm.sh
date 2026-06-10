@@ -79,32 +79,38 @@ echo "==> Preparing Salt file roots..."
 
 mkdir -p /srv/salt /srv/pillar
 
-# symlinks
+# Clean up any old namespaced layout from previous runs of this script
+rm -f /srv/salt/top.sls
+rm -rf /srv/salt/baseline-repo
+rm -f /srv/pillar/top.sls
+rm -rf /srv/pillar/baseline-repo
+
+# Make the state modules available directly under /srv/salt
+# (baseline/ and monitoring/ are the top-level state entry points)
 if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
-    ln -sfn "$REPO_ROOT/salt" /srv/salt/baseline-repo
-    ln -sfn "$REPO_ROOT/pillar" /srv/pillar/baseline-repo
+    ln -sfn "$REPO_ROOT/salt/baseline" /srv/salt/baseline
+    ln -sfn "$REPO_ROOT/salt/monitoring" /srv/salt/monitoring
 
-    # Create minimal top files if they don't exist
-    if [[ ! -f /srv/salt/top.sls ]]; then
-        cat > /srv/salt/top.sls << 'EOF'
-base:
-  '*':
-    - baseline-repo.baseline.init
-EOF
-    fi
+    # Symlink pillar tree so the repository's pillar/top.sls is used
+    ln -sfn "$REPO_ROOT/pillar" /srv/pillar
 
-    if [[ ! -f /srv/pillar/top.sls ]]; then
-        cat > /srv/pillar/top.sls << 'EOF'
-base:
-  '*':
-    - baseline-repo.baseline
-EOF
-    fi
-
-    echo "    Symlinked repository into /srv/salt and /srv/pillar"
+    echo "    Symlinked baseline/ and monitoring/ into /srv/salt"
+    echo "    Symlinked pillar/ into /srv/pillar"
 else
     echo "    WARNING: Could not find salt/baseline in repo root."
     echo "    You will need to manually set up /srv/salt and /srv/pillar."
+fi
+
+# Optional: create a simple top.sls for highstate usage (state.apply without args).
+# Not required for the recommended "state.apply baseline" command.
+if [[ -d /srv/salt/baseline ]]; then
+    cat > /srv/salt/top.sls << 'EOF'
+base:
+  '*':
+    - baseline
+    - monitoring
+EOF
+    echo "    Created /srv/salt/top.sls for highstate"
 fi
 
 # final instructions
@@ -122,9 +128,10 @@ echo "  2. Run all Goss tests:"
 echo "     make goss"
 echo
 echo "  3. Run tests for a specific component:"
-echo "     make goss-sysctl"
-echo "     make goss-firewalld"
+echo "     make goss-chrony"
 echo "     make goss-profile"
+echo "     make goss-systemd-resolved"
+echo "     make goss-usb"
 echo
 echo "  4. (Optional) Install goss via make if you prefer a local binary:"
 echo "     make install-goss"
