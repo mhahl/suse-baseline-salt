@@ -5,7 +5,7 @@
 
 node_exporter_package:
   pkg.installed:
-    - name: prometheus-node_exporter
+    - name: golang-github-prometheus-node_exporter
 
 node_exporter_config:
   file.managed:
