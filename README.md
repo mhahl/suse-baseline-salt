@@ -159,7 +159,7 @@ journalctl -u falco -n 20
 - **USB storage** is blocked by default (`usb` module).
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
 - Several modules are **disabled by default** — enable them explicitly in pillar.
-- The `vmagent` binary is downloaded from GitHub releases.
+- `vmagent` (and other VictoriaMetrics tools) are installed from the openSUSE Build Service Percona repository.
 
 ---
 

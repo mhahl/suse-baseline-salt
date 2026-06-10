@@ -1,6 +1,5 @@
 {% set falco = salt['pillar.get']('monitoring:falco', {}) %}
 {% set enabled = salt['pillar.get']('monitoring:falco:enabled', False) %}
-
 {% if enabled %}
 
 falco_gpg_key:

@@ -21,17 +21,34 @@ vmagent_directories:
     - require:
       - user: vmagent_user
 
-vmagent_binary:
+# Install vmagent from the openSUSE Build Service Percona repository
+# (provides VictoriaMetrics package containing vmagent, vmalert, etc.)
+vmagent_repo:
   file.managed:
-    - name: /usr/local/bin/vmagent
-    - source: https://github.com/VictoriaMetrics/VictoriaMetrics/releases/latest/download/vmagent-linux-amd64.tar.gz
-    - source_hash: https://github.com/VictoriaMetrics/VictoriaMetrics/releases/latest/download/vmagent-linux-amd64.tar.gz.sha256
-    - archive_format: tar
-    - tar_options: --strip-components=1
-    - user: root
-    - group: root
-    - mode: '0755'
-    - unless: test -x /usr/local/bin/vmagent
+    - name: /etc/zypp/repos.d/server_database_percona.repo
+    - source: https://download.opensuse.org/repositories/server:/database:/percona/openSUSE_Tumbleweed/server:database:percona.repo
+    - skip_verify: true
+
+vmagent_repo_refresh:
+  cmd.run:
+    - name: zypper --gpg-auto-import-keys -n refresh server_database_percona
+    - require:
+      - file: vmagent_repo
+
+vmagent_package:
+  pkg.installed:
+    - name: VictoriaMetrics
+    - require:
+      - cmd: vmagent_repo_refresh
+
+# Ensure the packaged victoria-metrics server unit is not enabled
+# (we only want the vmagent agent from this package)
+victoria_metrics_server_disabled:
+  service.dead:
+    - name: victoria-metrics
+    - enable: False
+    - require:
+      - pkg: vmagent_package
 
 vmagent_scrape_config:
   file.managed:
@@ -65,7 +82,7 @@ vmagent_service:
       - file: vmagent_scrape_config
       - file: vmagent_service_file
     - require:
-      - file: vmagent_binary
+      - pkg: vmagent_package
       - file: vmagent_service_file
 
 {% else %}

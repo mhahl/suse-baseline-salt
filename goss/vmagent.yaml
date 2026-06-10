@@ -7,7 +7,7 @@ user:
     title: "vmagent system user exists"
 
 file:
-  /usr/local/bin/vmagent:
+  /usr/sbin/vmagent:
     exists: true
     mode: "0755"
     owner: root
