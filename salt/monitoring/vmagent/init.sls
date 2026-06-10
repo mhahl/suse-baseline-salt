@@ -1,5 +1,5 @@
-{% set vmagent = pillar.get('monitoring:vmagent', {}) %}
-{% set enabled = vmagent.get('enabled', False) %}
+{% set vmagent = salt['pillar.get']('monitoring:vmagent', {}) %}
+{% set enabled = salt['pillar.get']('monitoring:vmagent:enabled', False) %}
 
 {% if enabled %}
 

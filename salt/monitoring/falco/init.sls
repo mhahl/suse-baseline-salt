@@ -1,5 +1,5 @@
-{% set falco = pillar.get('monitoring:falco', {}) %}
-{% set enabled = falco.get('enabled', False) %}
+{% set falco = salt['pillar.get']('monitoring:falco', {}) %}
+{% set enabled = salt['pillar.get']('monitoring:falco:enabled', False) %}
 
 {% if enabled %}
 

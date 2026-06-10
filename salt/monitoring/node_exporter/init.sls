@@ -1,5 +1,5 @@
-{% set node_exporter = pillar.get('monitoring:node_exporter', {}) %}
-{% set enabled = node_exporter.get('enabled', False) %}
+{% set node_exporter = salt['pillar.get']('monitoring:node_exporter', {}) %}
+{% set enabled = salt['pillar.get']('monitoring:node_exporter:enabled', False) %}
 
 {% if enabled %}
 
