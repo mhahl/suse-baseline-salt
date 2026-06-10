@@ -8,8 +8,8 @@ package:
 service:
   chronyd:
     enabled: true
-    running: false
-    title: "chronyd service is enabled"
+    running: true
+    title: "chronyd service is enabled and running"
 
 file:
   /etc/chrony.conf:

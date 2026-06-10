@@ -3,27 +3,11 @@
 DNS={{dns.dns}}
 {% endif %}
 
-# 2. Disable Fallback
-# Ensures we never fail over to insecure ISP or Google servers if our tunnel fails.
 FallbackDNS=
-
-# 3. Routing (Global Override)
-# Force ALL traffic to use the global DNS settings, ignoring DHCP-provided servers.
 Domains=~.
-
-# 4. Strict Security & Privacy
-# "yes" = Strict mode. Fails closed if TLS cannot be negotiated.
 DNSOverTLS=yes
-
-# "yes" = Validate DNSSEC signatures.
 DNSSEC=yes
-
-# 5. Disable Local Discovery Protocols
-# Prevents local spoofing/poisoning (Responder/LLMNR poisoning).
 MulticastDNS=no
 LLMNR=no
-
-# 6. Caching & Stub Listener
-# Disable negative caching to prevent "does not exist" spoofing persistence.
 Cache=no-negative
 DNSStubListener=yes

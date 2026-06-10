@@ -8,9 +8,8 @@ package:
 service:
   systemd-resolved:
     enabled: true
-    # In Goss container tests we intentionally do not start services
-    running: false
-    title: "systemd-resolved service is enabled (not started in container tests)"
+    running: true
+    title: "systemd-resolved service is enabled and running"
 
 file:
   /etc/systemd/resolved.conf:
@@ -27,12 +26,3 @@ file:
     filetype: symlink
     linked-to: /run/systemd/resolve/stub-resolv.conf
     title: "/etc/resolv.conf is symlinked to systemd-resolved stub"
-
-command:
-  # Container-aware wrapper for the resolv.conf symlink check.
-  # We avoid the `skip:` list syntax under file/command resources because
-  # Goss v0.4.9 cannot unmarshal a sequence into the (bool) skip field
-  # ("cannot unmarshal !!seq into bool").
-  "sh -c 'systemd-detect-virt --container >/dev/null 2>&1 && exit 0 || test -L /etc/resolv.conf && [ \"$(readlink /etc/resolv.conf)\" = \"/run/systemd/resolve/stub-resolv.conf\" ]'":
-    exit-status: 0
-    title: "/etc/resolv.conf is symlinked to systemd-resolved stub (skipped in container)"

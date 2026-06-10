@@ -1,28 +1,20 @@
-# Falco configuration managed by Salt
-# https://falco.org/docs/reference/config/
-
-# File containing Falco rules
 rules_file:
   - /etc/falco/falco_rules.yaml
   - /etc/falco/falco_rules.local.yaml
   - /etc/falco/rules.d
 
-# Whether to output events in json or text
 json_output: true
 json_include_output_property: true
 
-# Send events via HTTP
 http_output:
   enabled: true
   url: {{ falco.get('http_output_url', 'https://falco.sigaint.au') }}
 
-# Logging
 logging:
   enabled: true
   level: info
   destination: /var/log/falco/falco.log
 
-# Output channels
 stdout_output:
   enabled: false
 
@@ -32,6 +24,5 @@ syslog_output:
 file_output:
   enabled: false
 
-# Program output (optional)
 program_output:
   enabled: false

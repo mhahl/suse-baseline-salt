@@ -1,14 +1,8 @@
-# Falco security runtime monitoring
-# https://falco.org/
-
 {% set falco = pillar.get('monitoring:falco', {}) %}
 {% set enabled = falco.get('enabled', False) %}
 
 {% if enabled %}
 
-{% from 'baseline/map.jinja' import running_in_container with context %}
-
-# Add Falco official repository
 falco_repo:
   pkgrepo.managed:
     - name: falco
@@ -24,11 +18,10 @@ falco_package:
     - require:
       - pkgrepo: falco_repo
 
-# Main Falco configuration
 falco_config:
   file.managed:
     - name: /etc/falco/falco.yaml
-    - source: salt://baseline/falco/templates/falco.yaml.jinja
+    - source: salt://monitoring/falco/templates/falco.yaml.jinja
     - template: jinja
     - user: root
     - group: root
@@ -38,8 +31,6 @@ falco_config:
     - require:
       - pkg: falco_package
 
-{% if not running_in_container %}
-# Enable and start Falco
 falco_service:
   service.running:
     - name: falco
@@ -48,19 +39,11 @@ falco_service:
       - file: falco_config
     - require:
       - pkg: falco_package
-{% else %}
-# Still enable (but do not start) so goss/container tests see enabled: true
-falco_enabled:
-  service.enabled:
-    - name: falco
-    - require:
-      - pkg: falco_package
-{% endif %}
 
 {% else %}
 
 falco_disabled:
   test.show_notification:
-    - text: "Falco is disabled in pillar (baseline:falco:enabled)"
+    - text: "Falco is disabled in pillar (monitoring:falco:enabled)"
 
 {% endif %}

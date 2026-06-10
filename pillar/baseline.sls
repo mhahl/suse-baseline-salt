@@ -1,9 +1,18 @@
-# This file is kept for backwards compatibility or global baseline settings.
-#
-# Most baseline pillar data has been moved into modular category files:
-#   - pillar/baseline/system/init.sls
-#   - pillar/baseline/hardening/init.sls
-#   - pillar/baseline/network/init.sls
-#
-# See pillar/top.sls for the current includes.
+baseline:
+  systemd_resolved:
+    dns: "76.76.2.22#xldfopbe6w.dns.controld.com"
+
+  ntp:
+    servers:
+      - time1.google.com
+      - time2.google.com
+      - time3.google.com
+      - time4.google.com
+    iburst: true
+
+  updates:
+    auto_dup: false
+
+  usb:
+    block_storage: true
 

@@ -3,7 +3,7 @@
 package:
   falco:
     installed: true
-    title: "falco package is installed (when enabled)"
+    title: "falco package is installed"
 
 file:
   /etc/falco/falco.yaml:
@@ -19,6 +19,5 @@ file:
 service:
   falco:
     enabled: true
-    # In Goss container tests we intentionally do not start services
-    running: false
-    title: "falco service is enabled (not started in container tests)"
+    running: true
+    title: "falco service is enabled and running"

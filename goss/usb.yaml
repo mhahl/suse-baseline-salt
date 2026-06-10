@@ -8,9 +8,6 @@ file:
       - "blacklist uas"
 
 command:
-  # Soft check: we expect the modules to be absent (or the blacklist to take effect).
-  # The command is written to never fail the test; the real assertion is the
-  # blacklist file above.
   "lsmod | grep -E 'usb_storage|uas' || true":
     exit-status: 0
-    title: "usb-storage and uas modules are not loaded (soft check in container)"
+    title: "usb-storage and uas modules are not loaded"

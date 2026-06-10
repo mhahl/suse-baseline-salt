@@ -1,11 +1,6 @@
 base:
   '*':
-    # Baseline - now modular by category
-    - baseline.system
-    - baseline.hardening
-    - baseline.network
-
-    # Monitoring & Observability (modular)
+    - baseline
     - monitoring.falco
     - monitoring.node_exporter
     - monitoring.vmagent

@@ -1,20 +1,3 @@
-# Forgejo / Gitea Actions workflow
-# Runs the Goss tests inside a container on openSUSE Tumbleweed runners.
-#
-# - The job is scheduled on runners labeled `opensuse-tumbleweed`
-#   (these runners must have a container runtime available, e.g. Docker/Podman).
-# - The actual test steps execute inside a fresh `opensuse/tumbleweed:latest`
-#   container for a clean, reproducible environment.
-# - `--privileged` is used so that sysctl writes, systemd unit state, etc.
-#   can be exercised as much as possible inside the container.
-#
-# Notes:
-# - Monitoring modules (falco, node_exporter, vmagent) are explicitly enabled
-#   via a CI pillar so their Goss assertions are exercised.
-# - Assertions that require a full host (live kernel params, firewalld runtime
-#   commands, etc.) are automatically skipped inside the container via the
-#   existing skip rules in the goss/ files (using `systemd-detect-virt --container`).
-
 name: goss
 
 on:
@@ -58,8 +41,7 @@ jobs:
           zypper --non-interactive refresh
           zypper --non-interactive install --no-recommends \
             salt-minion make curl git ca-certificates \
-            audit chrony firewalld systemd-resolved cronie sudo \
-            pam pam-config cracklib systemd
+            chrony systemd-resolved systemd
           zypper --non-interactive install --no-recommends prometheus-node_exporter || true
 
       - name: Install Goss
@@ -76,20 +58,16 @@ jobs:
           set -euo pipefail
           mkdir -p /srv/salt /srv/pillar
 
-          echo "=== Detecting checked-out source tree inside container ==="
           SRC=""
-          # 1. Try git (reliable if we are inside the work tree)
           if command -v git >/dev/null 2>&1; then
             SRC="$(git rev-parse --show-toplevel 2>/dev/null || true)"
           fi
-          # 2. Most robust: locate an actual file written by actions/checkout
           if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
             found=$(find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -1 || true)
             if [ -n "$found" ]; then
               SRC=$(dirname "$(dirname "$found")")
             fi
           fi
-          # 3. Last resort: common paths used by runners + the env var
           if [ -z "$SRC" ] || [ ! -d "$SRC/salt/baseline" ]; then
             for cand in "$GITHUB_WORKSPACE" "$PWD" /workspace /home/runner/_work/*/* /__w/*/* /root; do
               if [ -d "$cand/salt/baseline" ]; then
@@ -110,13 +88,7 @@ jobs:
             exit 1
           fi
 
-          echo "Source root: $SRC"
-          ls -ld "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls"
-
-          # Write the generated top.sls + CI pillar into /srv (these are small and provide
-          # the highstate entrypoints + the monitoring enablement overrides).
-          # The real state/pillar content will be reached by listing the real checkout
-          # dirs directly in file_roots / pillar_roots below.
+          ls -ld "$SRC/salt/baseline/init.sls" "$SRC/salt/monitoring/init.sls" 2>/dev/null || true
           cat > /srv/salt/top.sls << 'EOF'
           base:
             '*':
@@ -127,14 +99,10 @@ jobs:
           cat > /srv/pillar/top.sls << 'EOF'
           base:
             '*':
-              # Baseline pillar data is split by category (no top-level "baseline" SLS exists)
-              - baseline.system
-              - baseline.hardening
-              - baseline.network
+              - baseline
               - monitoring.falco
               - monitoring.node_exporter
               - monitoring.vmagent
-              # CI overrides (enables monitoring modules for Goss coverage)
               - ci
           EOF
 
@@ -153,8 +121,6 @@ jobs:
                     - targets: ['127.0.0.1:9100']
           EOF
 
-          # Write a complete ready-to-use minion config that points at both the generated
-          # tops in /srv and the real content from the checkout. No symlinks needed.
           mkdir -p /tmp/salt-ci/etc/salt
           cat > /tmp/salt-ci/etc/salt/minion << EOF
           file_roots:
@@ -167,33 +133,21 @@ jobs:
               - $SRC/pillar
           EOF
 
-          echo "Minion config:"
           cat /tmp/salt-ci/etc/salt/minion
-          echo "Salt roots and pillars prepared."
 
-      - name: Apply Salt states (baseline + monitoring)
+      - name: Apply states
         run: |
           set -euo pipefail
 
-          echo "SLS roots visible to Salt (under configured file_roots):"
           find /srv/salt -name 'init.sls' | sort || true
-          echo "file_roots from this config:"
           salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning config.get file_roots || true
 
-          echo "Also searching entire container for any copy of the SLS (for debugging):"
           find / -path '*/salt/baseline/init.sls' -type f 2>/dev/null | head -5 || true
 
-          # Some states (sysctl live apply, certain service.enabled queries, augenrules,
-          # symlink creation for resolv.conf, etc.) are expected to have errors or "fail"
-          # in a container environment even with our guards. We tolerate the overall
-          # retcode here so the step succeeds and Goss can validate the delivered files,
-          # packages, and configs for the enabled modules.
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline || echo "baseline apply completed (some non-fatal container-related errors are normal; see summary above). Continuing to Goss."
-          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring || echo "monitoring apply completed (some non-fatal container-related errors are normal; see summary above). Continuing to Goss."
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls baseline || echo "baseline apply completed. Continuing."
+          salt-call --local -c /tmp/salt-ci/etc/salt --log-level=warning state.sls monitoring || echo "monitoring apply completed. Continuing."
 
       - name: Run Goss (all tests)
         run: |
           set -euo pipefail
-          # Goss files contain skip rules that trigger inside containers
-          # (kernel params, firewalld runtime commands, etc.).
           goss --gossfile goss/goss.yaml validate --format tap

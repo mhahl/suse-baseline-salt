@@ -5,14 +5,10 @@
 server {{ server }}{% if iburst %} iburst{% endif %}
 {% endfor %}
 
-# Standard chrony settings
 driftfile {{ ntp.get('driftfile', '/var/lib/chrony/drift') }}
 makestep {{ ntp.get('makestep', '1.0 3') }}
 rtcsync
-
 keyfile /etc/chrony.keys
 leapsectz right/UTC
 logdir /var/log/chrony
-
-# Allow large initial steps (useful after VM suspend/resume)
 minsources 3

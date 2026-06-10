@@ -1,26 +1,9 @@
 #!/usr/bin/env bash
-#
-# setup-test-vm.sh
-#
-# Utility script to prepare a SUSE VM (Tumbleweed or Leap/SLES) for testing
-# the suse-baseline-salt repository.
-#
-# Usage:
-#   ./scripts/setup-test-vm.sh
-#
-# What it does:
-#   - Installs required packages (salt, make, curl, etc.)
-#   - Downloads and installs Goss
-#   - Prepares /srv/salt and /srv/pillar directories
-#   - Creates symlinks from the current repository
-#   - Prints next steps for applying states and running tests
-#
-
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Basic sanity check that we are inside the expected repository structure
+# sanity check
 if [[ ! -d "$REPO_ROOT/salt/baseline" || ! -d "$REPO_ROOT/goss" ]]; then
     echo "ERROR: This script must be run from inside a clone of suse-baseline-salt."
     echo "Expected to find salt/baseline/ and goss/ directories relative to the script."
@@ -31,7 +14,7 @@ echo "==> Preparing SUSE VM for suse-baseline-salt testing"
 echo "    Repository root: $REPO_ROOT"
 echo
 
-# --- Check we are on a SUSE system ------------------------------------------
+# check SUSE
 if [[ ! -f /etc/os-release ]]; then
     echo "ERROR: This script is intended for openSUSE / SLES systems."
     exit 1
@@ -46,17 +29,17 @@ fi
 
 echo "Detected: ${PRETTY_NAME:-$ID}"
 
-# --- Require root -----------------------------------------------------------
+# require root
 if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root (use sudo)."
     exit 1
 fi
 
-# --- Refresh repositories ---------------------------------------------------
+# refresh repos
 echo "==> Refreshing package repositories..."
 zypper --non-interactive refresh
 
-# --- Install required packages ----------------------------------------------
+# install packages
 echo "==> Installing required packages..."
 
 PACKAGES=(
@@ -67,7 +50,7 @@ PACKAGES=(
     ca-certificates
 )
 
-# Packages commonly used by the baseline states
+# baseline packages
 PACKAGES+=(
     audit
     cronie
@@ -78,7 +61,7 @@ PACKAGES+=(
 
 zypper --non-interactive install --no-recommends "${PACKAGES[@]}"
 
-# --- Install Goss -----------------------------------------------------------
+# install goss
 GOSS_VERSION="${GOSS_VERSION:-v0.4.9}"
 GOSS_URL="https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64"
 GOSS_BIN="/usr/local/bin/goss"
@@ -91,12 +74,12 @@ else
     echo "==> Goss already installed: $(goss --version 2>/dev/null || echo 'unknown version')"
 fi
 
-# --- Prepare Salt directories -----------------------------------------------
+# prepare salt dirs
 echo "==> Preparing Salt file roots..."
 
 mkdir -p /srv/salt /srv/pillar
 
-# Create symlinks from the repository (idempotent)
+# symlinks
 if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
     ln -sfn "$REPO_ROOT/salt" /srv/salt/baseline-repo
     ln -sfn "$REPO_ROOT/pillar" /srv/pillar/baseline-repo
@@ -124,7 +107,7 @@ else
     echo "    You will need to manually set up /srv/salt and /srv/pillar."
 fi
 
-# --- Final instructions -----------------------------------------------------
+# final instructions
 echo
 echo "==================================================================="
 echo "  SUSE VM setup complete!"

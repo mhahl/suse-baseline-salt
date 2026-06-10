@@ -1,9 +1,0 @@
-# =============================================================================
-# SUSE Baseline - PAM Faillock (Account Lockout)
-# =============================================================================
-deny = {{ pillar.get('baseline:pam:faillock_deny', 5) }}
-unlock_time = {{ pillar.get('baseline:pam:faillock_unlock_time', 900) }}
-fail_interval = {{ pillar.get('baseline:pam:faillock_fail_interval', 900) }}
-even_deny_root
-root_unlock_time = 0
-admin_group = wheel

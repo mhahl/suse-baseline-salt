@@ -15,9 +15,8 @@ This project provides a **modular** baseline for SUSE systems with clear separat
 
 | Category     | Modules |
 |--------------|---------|
-| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `coredump`, `updates` |
-| **Hardening**    | `sysctl`, `audit`, `sudo`, `pam`, `fapolicyd`, `usb`, `grub` |
-| **Network**      | `firewalld` |
+| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `updates` |
+| **Hardening**    | `usb` |
 | **Monitoring**   | `falco`, `node_exporter`, `vmagent` |
 
 ### Highlights
@@ -52,9 +51,7 @@ All configuration lives in pillar. See the modular structure:
 # pillar/top.sls
 base:
   '*':
-    - baseline.system
-    - baseline.hardening
-    - baseline.network
+    - baseline
     - monitoring.falco
     - monitoring.node_exporter
     - monitoring.vmagent
@@ -63,9 +60,9 @@ base:
 ### Example Pillar
 
 See:
-- [`pillar/baseline/system/init.sls`](pillar/baseline/system/init.sls)
-- [`pillar/baseline/hardening/init.sls`](pillar/baseline/hardening/init.sls)
+- [`pillar/baseline.sls`](pillar/baseline.sls) — baseline system + hardening settings (usb, ntp, resolved, updates)
 - [`pillar/monitoring/falco.sls`](pillar/monitoring/falco.sls)
+- [`pillar/monitoring/node_exporter.sls`](pillar/monitoring/node_exporter.sls)
 - [`pillar/monitoring/vmagent.sls`](pillar/monitoring/vmagent.sls)
 
 ---
@@ -147,10 +144,8 @@ chronyc sources
 systemctl status falco prometheus-node_exporter vmagent
 
 # Hardening
-sysctl -a | grep -E 'rp_filter|dmesg_restrict'
-auditctl -l | head
-sudo -l
-cat /etc/security/faillock.conf
+lsmod | grep -E 'usb_storage|uas' || true
+cat /etc/modprobe.d/99-baseline-usb-storage.conf
 
 # Monitoring
 curl -s http://localhost:9100/metrics | head
@@ -161,7 +156,6 @@ journalctl -u falco -n 20
 
 ## ⚠️ Important Notes
 
-- **Firewalld** is set to `drop` zone by default.
 - **USB storage** is blocked by default (`usb` module).
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
 - Several modules are **disabled by default** — enable them explicitly in pillar.
