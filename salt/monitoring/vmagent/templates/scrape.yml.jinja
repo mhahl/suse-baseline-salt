@@ -4,9 +4,6 @@ global:
     fqdn:     "{{ grains['fqdn'] }}"
     env:      "{{ vmagent.get('environment', 'production') }}"
 
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
 scrape_configs:
   - job_name: 'falco'
     static_configs:
