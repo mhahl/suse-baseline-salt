@@ -58,8 +58,6 @@ vmagent_scrape_config:
     - user: vmagent
     - group: vmagent
     - mode: '0644'
-    - context:
-        vmagent: {{ vmagent | tojson }}
     - require:
       - file: vmagent_directories
 
