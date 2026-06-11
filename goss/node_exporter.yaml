@@ -18,5 +18,4 @@ file:
 service:
   prometheus-node_exporter:
     enabled: true
-    running: true
     title: "node_exporter service is enabled and running"

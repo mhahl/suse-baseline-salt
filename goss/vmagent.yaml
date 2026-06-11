@@ -44,5 +44,4 @@ file:
 service:
   vmagent:
     enabled: true
-    running: true
     title: "vmagent service is enabled and running"
