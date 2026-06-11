@@ -3,7 +3,7 @@
 file:
   /etc/zypp/zypp.conf:
     exists: true
-    contains:
+    contents:
       - "solver.onlyRequires = true"
 
 command:

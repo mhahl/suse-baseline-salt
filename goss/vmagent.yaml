@@ -19,7 +19,7 @@ file:
     mode: "0644"
     owner: vmagent
     group: vmagent
-    contains:
+    contents:
       - "job_name:"
     title: "vmagent scrape config exists"
 
@@ -28,7 +28,7 @@ file:
     mode: "0644"
     owner: root
     group: root
-    contains:
+    contents:
       - "vmagent"
       - "remoteWrite.url"
       - "remoteWrite.tmpDataPath"

@@ -3,6 +3,6 @@
 file:
   /etc/modprobe.d/99-baseline-usb-storage.conf:
     exists: true
-    contains:
+    contents:
       - "blacklist usb-storage"
       - "blacklist uas"

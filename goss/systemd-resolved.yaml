@@ -9,7 +9,7 @@ file:
   /etc/systemd/resolved.conf:
     exists: true
     mode: "0644"
-    contains:
+    contents:
       - "DNSOverTLS=yes"
       - "DNSSEC=yes"
       - "FallbackDNS="

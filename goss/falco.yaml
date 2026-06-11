@@ -11,7 +11,7 @@ file:
     mode: "0644"
     owner: root
     group: root
-    contains:
+    contents:
       - "http_output:"
       - "enabled: true"
     title: "falco HTTP output is enabled in config"

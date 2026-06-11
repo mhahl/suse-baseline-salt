@@ -14,7 +14,7 @@ file:
   /etc/chrony.conf:
     exists: true
     mode: "0644"
-    contains:
+    contents:
       - "server time1.google.com"
       - "rtcsync"
       - "minsources 3"

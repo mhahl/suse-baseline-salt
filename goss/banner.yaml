@@ -5,7 +5,7 @@ file:
     exists: true
     mode: "0644"
     owner: root
-    contains:
+    contents:
       - "It's a UNIX System!"
       - "I know this!"
     title: "motd banner is installed"
