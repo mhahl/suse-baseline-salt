@@ -1,9 +1,12 @@
 # Goss tests for baseline.systemd-resolved
 
 package:
-  systemd-resolved:
+  # NOTE: the split systemd-resolved package exists only on 16+; on 15.x
+  # the resolver ships in monolithic `systemd` (see map.jinja), which is
+  # present on every SUSE host, so assert that instead.
+  systemd:
     installed: true
-    title: "systemd-resolved package is installed"
+    title: "systemd base package is installed"
 
 file:
   /etc/systemd/resolved.conf:
@@ -18,3 +21,5 @@ file:
 
   /etc/resolv.conf:
     exists: true
+    linked-to: /run/systemd/resolve/stub-resolv.conf
+    title: "resolv.conf points at the systemd-resolved stub"

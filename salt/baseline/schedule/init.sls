@@ -8,6 +8,13 @@
 {% set mine_cfg = sched.get('mine_update', {}) %}
 {% set highstate_cfg = sched.get('highstate', {}) %}
 
+{# The nightly highstate uses a cron expression, which the minion only
+   evaluates with the croniter module installed (source package
+   python-croniter, binary python3-croniter on SUSE). #}
+schedule_croniter_package:
+  pkg.installed:
+    - name: python3-croniter
+
 {% if enabled and mine_cfg.get('enabled', True) %}
 baseline_mine_update:
   schedule.present:
@@ -29,6 +36,8 @@ baseline_highstate_nightly:
     - function: state.highstate
     - cron: "{{ highstate_cfg.get('cron', '17 2 * * *') }}"
     - splay: {{ highstate_cfg.get('splay', 900) }}
+    - require:
+      - pkg: schedule_croniter_package
 {% else %}
 baseline_highstate_nightly:
   schedule.absent:

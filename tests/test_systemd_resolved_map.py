@@ -67,6 +67,21 @@ def test_modern_suse_uses_split_package(grains):
     assert render_map(grains) == "systemd-resolved"
 
 
+@pytest.mark.parametrize(
+    "grains",
+    [
+        {"os": "openSUSE Leap", "os_family": "Suse", "osmajorrelease": 15},
+        {"os": "openSUSE Tumbleweed", "os_family": "Suse",
+         "osmajorrelease": 20250905},
+    ],
+)
+def test_netconfig_guard_only_on_suse(grains):
+    rendered = render_init(grains)
+    assert 'NETCONFIG_DNS_POLICY=""' in rendered
+    other = render_init({"os_family": "Debian", "osmajorrelease": "12"})
+    assert "NETCONFIG_DNS_POLICY" not in other
+
+
 def test_init_wires_selected_package_and_keeps_stub_symlink():
     leap = render_init({"os": "openSUSE Leap", "os_family": "Suse",
                         "osmajorrelease": 15})
