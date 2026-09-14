@@ -1,6 +1,7 @@
+{% from "baseline/systemd-resolved/map.jinja" import resolved with context %}
 systemd_resolved_package:
   pkg.installed:
-    - name: systemd-resolved
+    - name: {{ resolved.pkg }}
 
 resolved_runtime_dir:
   file.directory:
