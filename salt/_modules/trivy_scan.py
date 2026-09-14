@@ -25,7 +25,7 @@ _SEVERITY_RANK = {
 
 def _opt(name, default=None):
     try:
-        return __pillar__.get("trivy", {}).get(name, default)  # noqa: F821
+        return __pillar__.get("baseline", {}).get("trivy", {}).get(name, default)  # noqa: F821
     except (AttributeError, NameError):
         return default
 

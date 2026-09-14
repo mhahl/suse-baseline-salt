@@ -1,9 +1,9 @@
 gossfile:
   banner.yaml: {}
-  chrony.yaml: {}
   profile.yaml: {}
   schedule.yaml: {}
   systemd-resolved.yaml: {}
+  timesyncd.yaml: {}
   trivy.yaml: {}
   updates.yaml: {}
   usb.yaml: {}

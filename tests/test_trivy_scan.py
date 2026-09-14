@@ -21,7 +21,7 @@ def load_module(pillar=None, grains=None, salt=None):
     spec = importlib.util.spec_from_file_location("trivy_scan", MOD_PATH)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    mod.__pillar__ = {"trivy": pillar or {}}
+    mod.__pillar__ = {"baseline": {"trivy": pillar or {}}}
     mod.__grains__ = {"id": "web01", **(grains or {})}
     if salt is not None:
         mod.__salt__ = salt

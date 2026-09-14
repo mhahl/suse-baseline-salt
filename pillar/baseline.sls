@@ -1,11 +1,11 @@
 baseline:
   systemd_resolved:
-    # Quad9 public DNS (malware-blocking, DNSSEC-validating). Both the
-    # primary and secondary are listed so resolution survives one being
-    # unreachable; the #suffix sets the DoT SNI hostname, which matters
-    # for DNS-over-TLS authentication. Personal resolvers (e.g. Controld
-    # with a per-account hostname) belong in host-specific pillar.
-    dns: "9.9.9.9#dns.quad9.net 149.112.112.112#dns.quad9.net"
+    # AdGuard resolvers over strict DNS-over-TLS (DNSOverTLS=yes in the
+    # template). The #suffix sets the DoT SNI/auth hostname — equivalent
+    # to kdig's +tls-sni. Port is always 853: systemd-resolved does not
+    # support custom DoT ports. Servers are tried in order; FallbackDNS
+    # stays empty because strict TLS never downgrades anyway.
+    dns: "51.161.136.107#dns.adguard.sigaint.au 139.99.149.92#dns.adguard.sigaint.au 139.99.210.89#dns.adguard.sigaint.au 139.99.210.170#dns.adguard.sigaint.au"
 
   ntp:
     servers:
@@ -36,25 +36,26 @@ baseline:
       cron: "17 2 * * *"
       splay: 900
 
-# Salt Mine functions, read by minions straight from pillar. Kept small
+  # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
+  # small summary published to the Salt Mine under trivy.scan_summary
+  # (counts, fixable total, top 20 CVEs). All keys are optional.
+  trivy:
+    version: '0.74.0'     # exact version for the tarball URL (SLES/binary flavor)
+    arch: '64bit'         # tarball arch suffix: '64bit' or 'ARM64'
+    pkg_version: ''       # exact package pin for repo installs (empty = repo latest)
+    severities: 'HIGH,CRITICAL'
+    top_n: 20             # CVEs kept in the mine summary 'top' list
+    skip_db_update: False # True = offline scans only, manage DB separately
+    cache_dir: '/var/cache/trivy'
+    report_path: '/var/cache/trivy/report.json'
+    run_initial_scan: True  # one scan on first apply (skipped if a report exists)
+    schedule_splay: 600     # seconds of random delay so the fleet scans evenly
+
+# Salt Mine functions, read by minions straight from pillar. Stays top
+# level: Salt only reads mine_functions from the pillar root. Kept small
 # on purpose: grains + addresses are what Overstate's Mine browser and
 # targeting need. Pushed hourly by the mine-update-hourly schedule above
 # (on top of Salt's built-in 60-minute mine_interval).
 mine_functions:
   grains.items: []
   network.ip_addrs: []
-
-# Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
-# small summary published to the Salt Mine under trivy.scan_summary
-# (counts, fixable total, top 20 CVEs). All keys are optional.
-trivy:
-  version: '0.74.0'     # exact version for the tarball URL (SLES/binary flavor)
-  arch: '64bit'         # tarball arch suffix: '64bit' or 'ARM64'
-  pkg_version: ''       # exact package pin for repo installs (empty = repo latest)
-  severities: 'HIGH,CRITICAL'
-  top_n: 20             # CVEs kept in the mine summary 'top' list
-  skip_db_update: False # True = offline scans only, manage DB separately
-  cache_dir: '/var/cache/trivy'
-  report_path: '/var/cache/trivy/report.json'
-  run_initial_scan: True  # one scan on first apply (skipped if a report exists)
-  schedule_splay: 600     # seconds of random delay so the fleet scans evenly

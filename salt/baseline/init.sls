@@ -1,9 +1,9 @@
 include:
   - baseline.banner
-  - baseline.chrony
   - baseline.profile
   - baseline.schedule
   - baseline.systemd-resolved
+  - baseline.timesyncd
   - baseline.trivy
   - baseline.updates
   - baseline.usb

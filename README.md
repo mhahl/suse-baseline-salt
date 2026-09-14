@@ -15,7 +15,7 @@ This project provides a **modular** baseline for SUSE systems.
 
 | Category     | Modules |
 |--------------|---------|
-| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `updates`, `schedule`, `trivy` |
+| **System**       | `systemd-resolved`, `timesyncd`, `profile`, `banner`, `updates`, `schedule`, `trivy` |
 | **Hardening**    | `usb` |
 
 ### Highlights
@@ -69,7 +69,7 @@ sudo ./scripts/setup-test-vm.sh
 # Run tests
 make lint
 make goss
-make goss-chrony
+make goss-timesyncd
 ```
 
 ### Available Make Targets
@@ -100,23 +100,26 @@ salt/
 ├── _modules/               # custom execution modules (synced automatically)
 │   └── trivy_scan.py       # scan/publish for the trivy module
 └── baseline/               # System + hardening (flat: one dir per module)
-    ├── init.sls            # includes banner, chrony, profile, schedule,
-    │                       # systemd-resolved, trivy, updates, usb
+    ├── init.sls            # includes banner, profile, schedule,
+    │                       # systemd-resolved, timesyncd, trivy, updates, usb
     ├── banner/
-    ├── chrony/
     ├── profile/
     ├── schedule/           # hourly mine.update + nightly highstate
     ├── systemd-resolved/
+    ├── timesyncd/          # NTP via systemd-timesyncd (replaces chrony)
     ├── trivy/              # daily Trivy CVE scans + mine publishing
     ├── updates/
     └── usb/
 
 pillar/
-├── baseline.sls            # baseline.* settings + mine_functions + trivy
+├── baseline.sls            # baseline.* settings + top-level mine_functions
 └── top.sls
 
 tests/
-└── test_trivy_scan.py      # pytest unit tests for the trivy_scan module
+├── test_timesyncd.py             # timesyncd drop-in + init render tests
+├── test_trivy_map.py             # trivy platform/arch selection render tests
+├── test_trivy_scan.py            # pytest unit tests for the trivy_scan module
+└── test_systemd_resolved_map.py  # resolved package selection render tests
 ```
 
 ---
@@ -128,7 +131,7 @@ After applying the states, run these checks:
 ```bash
 # System
 resolvectl status
-chronyc sources
+timedatectl show-timesync --all
 
 # Hardening
 lsmod | grep -E 'usb_storage|uas' || true
@@ -283,6 +286,20 @@ Contributions are welcome! Please:
 3. Add corresponding Goss tests in `goss/`
 4. Update pillar examples
 5. Run `make lint` and `make goss-<your-module>`
+
+### Naming conventions
+
+- **State IDs are `snake_case`** (`trivy_cache_dir`). Never reuse a scheduled
+  job's name as a state ID — pass it via `- name:` instead, so renaming
+  states can't silently rename jobs out from under the Schedules tab.
+- **All baseline pillar nests under `baseline:`** (`baseline:trivy`,
+  `baseline:ntp`). The only top-level exception is `mine_functions`, which
+  Salt reads exclusively from the pillar root.
+- **`map.jinja` selects on `os_family`, never exact `os` strings**
+  (openSUSE reports "openSUSE Leap", never bare "openSUSE").
+- **Platform variation lives in `map.jinja` + `pillar.get` merges**; SLS
+  files stay declarative with no grain conditionals except whole-state
+  gates.
 
 ---
 

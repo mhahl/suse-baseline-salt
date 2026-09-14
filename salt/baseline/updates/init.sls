@@ -7,7 +7,11 @@ updates_zypper_config:
     - group: root
     - mode: '0644'
 
-{% if salt['pillar.get']('baseline:updates:auto_dup', False) %}
+{# zypper dup is a rolling-release operation: running it on Leap/SLES
+   production hosts risks vendor-change breakage, so auto_dup applies to
+   Tumbleweed only no matter what pillar requests. #}
+{% set auto_dup = salt['pillar.get']('baseline:updates:auto_dup', False) and grains.get('os', '') == 'openSUSE Tumbleweed' %}
+{% if auto_dup %}
 tumbleweed_full_update:
   cmd.run:
     - name: /usr/bin/zypper --non-interactive dup --no-recommends
@@ -22,6 +26,6 @@ last_update_marker:
     - name: date -Iseconds > /var/log/baseline-last-update
     - onchanges:
       - file: updates_zypper_config
-{% if salt['pillar.get']('baseline:updates:auto_dup', False) %}
+{% if auto_dup %}
       - cmd: tumbleweed_full_update
 {% endif %}

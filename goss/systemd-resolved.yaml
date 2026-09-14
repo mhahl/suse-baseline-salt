@@ -16,7 +16,7 @@ file:
       - "DNSOverTLS=yes"
       - "DNSSEC=yes"
       - "FallbackDNS="
-      - "DNS=9.9.9.9#dns.quad9.net 149.112.112.112#dns.quad9.net"
+      - "DNS=51.161.136.107#dns.adguard.sigaint.au 139.99.149.92#dns.adguard.sigaint.au 139.99.210.89#dns.adguard.sigaint.au 139.99.210.170#dns.adguard.sigaint.au"
     title: "systemd-resolved uses DNS-over-TLS + DNSSEC"
 
   /etc/resolv.conf:

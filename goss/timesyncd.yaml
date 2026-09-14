@@ -1,0 +1,19 @@
+# Goss tests for baseline.timesyncd
+
+service:
+  systemd-timesyncd:
+    enabled: true
+    title: "systemd-timesyncd service is enabled"
+
+file:
+  /etc/systemd/timesyncd.conf.d/99-baseline.conf:
+    exists: true
+    mode: "0644"
+    contents:
+      - "NTP=time1.google.com"
+    title: "timesyncd drop-in sets the baseline NTP servers"
+
+package:
+  chrony:
+    installed: false
+    title: "chrony package is removed"

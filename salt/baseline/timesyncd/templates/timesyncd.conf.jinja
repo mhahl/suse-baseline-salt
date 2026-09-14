@@ -1,0 +1,10 @@
+{% set servers = ntp.get('servers', ['pool.ntp.org']) %}
+{% set fallback = ntp.get('fallback', []) %}
+{# Drop-in overrides the vendor timesyncd.conf without clobbering it.
+   FallbackNTP is omitted (not emptied) when unconfigured so the
+   compiled-in distro defaults still apply. #}
+[Time]
+NTP={{ servers | join(' ') }}
+{% if fallback %}
+FallbackNTP={{ fallback | join(' ') }}
+{% endif %}
