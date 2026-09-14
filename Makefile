@@ -25,7 +25,7 @@ PILLAR_SRV ?= /srv/pillar
 # Phony targets
 # ------------------------------------------------------------------------------
 .PHONY: help lint goss install-goss clean \
-        links unlink salt-call apply highstate
+        links unlink salt-call apply highstate overstate-deploy
 
 # ------------------------------------------------------------------------------
 # Help
@@ -58,6 +58,13 @@ help:
 	@echo "                        sudo make apply MODULE=baseline test=True"
 	@echo
 	@echo "  highstate           Run state.highstate using the local repo tree."
+	@echo
+	@echo "Overstate deployment (master file/pillar roots):"
+	@echo "  overstate-deploy    Copy states/pillar into Overstate roots"
+	@echo "                      (default OVERSTATE_SRV=/var/lib/overstate/srv;"
+	@echo "                      uses sudo only when the target is not writable)"
+	@echo "                      Override for other layouts, e.g.:"
+	@echo "                        make overstate-deploy OVERSTATE_SRV=/path/to/salt-srv"
 
 # ------------------------------------------------------------------------------
 # Testing targets (existing)
@@ -142,3 +149,46 @@ apply:
 
 highstate:
 	@$(MAKE) --no-print-directory salt-call SALT_ARGS="state.highstate $(SALT_ARGS)"
+
+# ------------------------------------------------------------------------------
+# Overstate deployment (master file/pillar roots)
+# ------------------------------------------------------------------------------
+# Overstate serves states from <srv>/salt and pillar from <srv>/pillar, where
+# <srv> is /var/lib/overstate/srv on prod (bind-mounted into the master
+# container). Plain copies are used deliberately, never symlinks: a link
+# pointing outside the bind mount dangles inside the container.
+OVERSTATE_SRV ?= /var/lib/overstate/srv
+OVERSTATE_SALT ?= $(OVERSTATE_SRV)/salt
+OVERSTATE_PILLAR ?= $(OVERSTATE_SRV)/pillar
+
+overstate-deploy:
+	@if [ -z "$(OVERSTATE_SRV)" ]; then \
+		echo "error: OVERSTATE_SRV is empty" >&2; exit 1; \
+	fi
+	@if { [ -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(OVERSTATE_SRV)" ]; } || \
+	   { [ ! -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(dir $(OVERSTATE_SRV))" ]; }; then \
+		echo "==> Elevating with sudo to write $(OVERSTATE_SRV)..."; \
+		sudo $(MAKE) --no-print-directory overstate-deploy OVERSTATE_SRV="$(OVERSTATE_SRV)"; \
+		exit $$?; \
+	fi
+	@echo "==> Deploying baseline into Overstate roots: $(OVERSTATE_SRV)"
+	@mkdir -p $(OVERSTATE_SALT) $(OVERSTATE_PILLAR) $(OVERSTATE_SALT)/_modules
+	@rm -rf $(OVERSTATE_SALT)/baseline
+	@cp -r $(REPO_ROOT)/salt/baseline $(OVERSTATE_SALT)/baseline
+	@cp -f $(REPO_ROOT)/salt/_modules/*.py $(OVERSTATE_SALT)/_modules/
+	@cp -f $(REPO_ROOT)/pillar/baseline.sls $(OVERSTATE_PILLAR)/baseline.sls
+	@if [ ! -f $(OVERSTATE_PILLAR)/top.sls ]; then \
+		cp $(REPO_ROOT)/pillar/top.sls $(OVERSTATE_PILLAR)/top.sls; \
+		echo "    installed pillar top.sls"; \
+	elif ! grep -qE '^[[:space:]]*-[[:space:]]*baseline[[:space:]]*$$' $(OVERSTATE_PILLAR)/top.sls; then \
+		echo "    NOTE: $(OVERSTATE_PILLAR)/top.sls exists without a baseline entry:"; \
+		echo "          add '- baseline' under base '*' to serve pillar."; \
+	fi
+	@if [ ! -f $(OVERSTATE_SALT)/top.sls ]; then \
+		printf "base:\n  '*':\n    - baseline\n" > $(OVERSTATE_SALT)/top.sls; \
+		echo "    created salt top.sls with baseline"; \
+	elif ! grep -qE '^[[:space:]]*-[[:space:]]*baseline[[:space:]]*$$' $(OVERSTATE_SALT)/top.sls; then \
+		echo "    NOTE: $(OVERSTATE_SALT)/top.sls exists without a baseline entry:"; \
+		echo "          add '- baseline' under base '*' (nightly highstate needs it)."; \
+	fi
+	@echo "Deployed. Apply from Overstate Jobs: state.apply baseline (or highstate)."

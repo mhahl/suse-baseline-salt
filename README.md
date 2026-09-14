@@ -166,6 +166,32 @@ Overstate's demo tree (`salt-srv/salt/top.sls` → `demo`) shows the expected
 shape. Keep both trees in git and sync them with Overstate's
 `scripts/sync-file-roots.sh`; the app only ever reads them.
 
+Deploy from a checkout of this repo on the master host:
+
+```sh
+sudo make overstate-deploy
+# Custom roots (e.g. an Overstate dev checkout) — no sudo needed
+# when you own the target. Use an absolute path: make expands `$H`
+# itself, so `~` and `$HOME` do not survive the command line
+# (escape as `$$HOME` if you must use it):
+make overstate-deploy OVERSTATE_SRV=/Users/mhahl/Developer/overstate/salt-srv
+```
+
+The target copies `salt/baseline/`, `salt/_modules/`, and
+`pillar/baseline.sls` into place, creates missing top files with a
+baseline entry, and never touches existing top files — if one lacks a
+baseline entry it prints the exact lines to add. Re-running is safe.
+
+> **Fresh prod installs:** `install.sh` seeds only the demo files, flattened
+> at `/var/lib/overstate/srv/` (`top.sls` + `demo.sls` at the root) — that
+> location is *outside* the master's file/pillar roots. The target creates
+> the `salt/` + `pillar/` subdirs; fold demo into the live top file with
+> `sudo cp /var/lib/overstate/srv/demo.sls /var/lib/overstate/srv/salt/demo.sls`.
+>
+> Use plain copies, not symlinks: the container only sees inside its
+> `/var/lib/overstate/srv` bind mount, so links pointing elsewhere on the
+> host dangle inside the master.
+
 ### 2. Let the master serve pillar
 
 Overstate ships file roots only — add pillar roots on the master:
