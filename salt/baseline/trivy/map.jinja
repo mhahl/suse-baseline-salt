@@ -1,0 +1,26 @@
+{# baseline/trivy/map.jinja — per-OS install flavor plus pillar-overridable defaults. #}
+{% set _os = grains.get('os', '') %}
+{% set _family = grains.get('os_family', '') %}
+{% if _family == 'RedHat' %}
+{% set _flavor = 'rpm_repo' %}
+{% elif _os == 'openSUSE' %}
+{% set _flavor = 'zypper' %}
+{% elif _os in ('SUSE', 'SLES') %}
+{% set _flavor = 'binary' %}
+{% else %}
+{% set _flavor = 'unsupported' %}
+{% endif %}
+{% set trivy = {
+  'install_flavor': _flavor,
+  'version': '0.74.0',
+  'arch': '64bit',
+  'pkg_version': '',
+  'severities': 'HIGH,CRITICAL',
+  'top_n': 20,
+  'skip_db_update': False,
+  'cache_dir': '/var/cache/trivy',
+  'report_path': '/var/cache/trivy/report.json',
+  'run_initial_scan': True,
+  'schedule_splay': 600,
+} %}
+{% do trivy.update(salt['pillar.get']('trivy', {})) %}

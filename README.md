@@ -11,21 +11,21 @@
 
 ## ✨ Features
 
-This project provides a **modular** baseline for SUSE systems with clear separation between hardening and observability.
+This project provides a **modular** baseline for SUSE systems.
 
 | Category     | Modules |
 |--------------|---------|
-| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `updates` |
+| **System**       | `systemd-resolved`, `chrony`, `profile`, `banner`, `updates`, `schedule`, `trivy` |
 | **Hardening**    | `usb` |
-| **Monitoring**   | `falco`, `node_exporter`, `vmagent` |
 
 ### Highlights
 
 - **Forensic-ready** bash history and session controls
 - **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP)
-- **Modern security controls** (Falco, execution allowlisting, USB blocking)
-- **Observability out of the box** (Falco events + Prometheus metrics via VictoriaMetrics)
-- **Fully modular** — enable only what you need via pillar
+- **Modern security controls** (USB storage blocking)
+- **Vulnerability scanning** — daily Trivy OS-package scans with summaries published to the Salt Mine (`trivy.scan_summary`)
+- **Overstate-ready scheduling** — hourly mine updates plus a nightly highstate, visible in Overstate's Schedules tab
+- **Pillar-driven** — DNS, NTP, USB, schedule, trivy and update behavior are configurable via pillar
 
 ---
 
@@ -34,9 +34,6 @@ This project provides a **modular** baseline for SUSE systems with clear separat
 ```bash
 # Apply the full baseline
 salt '*' state.apply baseline
-
-# Or apply just monitoring
-salt '*' state.apply monitoring
 ```
 
 Or include it via your top file / highstate.
@@ -52,18 +49,12 @@ All configuration lives in pillar. See the modular structure:
 base:
   '*':
     - baseline
-    - monitoring.falco
-    - monitoring.node_exporter
-    - monitoring.vmagent
 ```
 
 ### Example Pillar
 
 See:
-- [`pillar/baseline.sls`](pillar/baseline.sls) — baseline system + hardening settings (usb, ntp, resolved, updates)
-- [`pillar/monitoring/falco.sls`](pillar/monitoring/falco.sls)
-- [`pillar/monitoring/node_exporter.sls`](pillar/monitoring/node_exporter.sls)
-- [`pillar/monitoring/vmagent.sls`](pillar/monitoring/vmagent.sls)
+- [`pillar/baseline.sls`](pillar/baseline.sls) — baseline system + hardening settings (usb, ntp, resolved, updates, schedule, trivy) plus top-level `mine_functions` for the Salt Mine
 
 ---
 
@@ -78,8 +69,7 @@ sudo ./scripts/setup-test-vm.sh
 # Run tests
 make lint
 make goss
-make goss-falco
-make goss-vmagent
+make goss-chrony
 ```
 
 ### Available Make Targets
@@ -98,11 +88,8 @@ See the [Makefile](Makefile) for more options.
 Goss tests run in containers on `opensuse-tumbleweed` runners:
 
 - **Baseline** tests: [`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)
-- **Monitoring** tests: [`.forgejo/workflows/monitoring.yml`](.forgejo/workflows/monitoring.yml)
 
-Workflows are triggered on push/PR to relevant paths (states, pillar, and their corresponding Goss test files). They run the appropriate subset of tests in isolation.
-
-(Linting and other checks can be added to the Forgejo workflows as needed.)
+The workflow is triggered on push/PR to relevant paths (states, pillar, and the corresponding Goss test files). It lints all YAML with yamllint before applying states and running Goss.
 
 ---
 
@@ -110,28 +97,26 @@ Workflows are triggered on push/PR to relevant paths (states, pillar, and their 
 
 ```
 salt/
-├── baseline/               # Core hardening
-│   ├── init.sls
-│   ├── system/             # Core system services
-│   ├── hardening/          # Security & hardening
-│   └── network/            # Network configuration
-│
-├── monitoring/             # Observability
-│   ├── init.sls
-│   ├── falco/
-│   ├── node_exporter/
-│   └── vmagent/
+├── _modules/               # custom execution modules (synced automatically)
+│   └── trivy_scan.py       # scan/publish for the trivy module
+└── baseline/               # System + hardening (flat: one dir per module)
+    ├── init.sls            # includes banner, chrony, profile, schedule,
+    │                       # systemd-resolved, trivy, updates, usb
+    ├── banner/
+    ├── chrony/
+    ├── profile/
+    ├── schedule/           # hourly mine.update + nightly highstate
+    ├── systemd-resolved/
+    ├── trivy/              # daily Trivy CVE scans + mine publishing
+    ├── updates/
+    └── usb/
 
 pillar/
-├── baseline/
-│   ├── system/
-│   ├── hardening/
-│   └── network/
-│
-└── monitoring/
-    ├── falco.sls
-    ├── node_exporter.sls
-    └── vmagent.sls
+├── baseline.sls            # baseline.* settings + mine_functions + trivy
+└── top.sls
+
+tests/
+└── test_trivy_scan.py      # pytest unit tests for the trivy_scan module
 ```
 
 ---
@@ -144,25 +129,115 @@ After applying the states, run these checks:
 # System
 resolvectl status
 chronyc sources
-systemctl status falco prometheus-node_exporter vmagent
 
 # Hardening
 lsmod | grep -E 'usb_storage|uas' || true
 cat /etc/modprobe.d/99-baseline-usb-storage.conf
 
-# Monitoring
-curl -s http://localhost:9100/metrics | head
-journalctl -u falco -n 20
+# Scheduling (Overstate fleets)
+cat /etc/salt/minion.d/_schedule.conf
+salt-call schedule.list
+salt-call mine.update && salt-call mine.get '*' grains.items
+
+# Vulnerability scanning
+ls -la /var/cache/trivy/report.json
+salt-call trivy_scan.publish
+salt-run mine.get '*' trivy.scan_summary
 ```
+
+---
+
+## 🖥️ Deploying to Overstate
+
+Overstate is a web UI in front of one Salt master: you accept keys, fire
+jobs, and read returns there, while Salt still does the work. This baseline is built to drop into it — states show up
+in the file browser, pillar in the pillar browser, and the `schedule` module
+feeds the Schedules tab while `mine_functions` feeds the Mine browser.
+
+### 1. Place the trees where the master serves them
+
+| This repo | Overstate dev (`salt-srv/`) | Bare-metal / Quadlet prod |
+|---|---|---|
+| `salt/baseline/` | `salt-srv/salt/baseline/` | `/srv/salt/baseline/` (or `/var/lib/overstate/srv/salt/baseline/`) |
+| `pillar/baseline.sls` | `salt-srv/pillar/baseline.sls` | `/srv/pillar/baseline.sls` (or `/var/lib/overstate/srv/pillar/…`) |
+| `pillar/top.sls` | `salt-srv/pillar/top.sls` | `/srv/pillar/top.sls` (or `/var/lib/overstate/srv/pillar/…`) |
+
+Overstate's demo tree (`salt-srv/salt/top.sls` → `demo`) shows the expected
+shape. Keep both trees in git and sync them with Overstate's
+`scripts/sync-file-roots.sh`; the app only ever reads them.
+
+### 2. Let the master serve pillar
+
+Overstate ships file roots only — add pillar roots on the master:
+
+```yaml
+# /etc/salt/master.d/pillar.conf  (adapt paths to your layout)
+pillar_roots:
+  base:
+    - /srv/pillar
+```
+
+```yaml
+# .../pillar/top.sls (this repo's file, served as-is)
+base:
+  '*':
+    - baseline
+```
+
+Pillar provides two things here: `baseline.*` settings for the states, and
+top-level `mine_functions` (`grains.items`, `network.ip_addrs`), which
+minions read straight from pillar — no minion config drop-ins needed.
+
+### 3. Include baseline in the state top file
+
+`state.apply baseline` works without touching top, but the **nightly
+highstate runs `state.highstate`**, so the top file must include it:
+
+```yaml
+# salt-srv/salt/top.sls (dev) — keep demo, add baseline
+base:
+  '*':
+    - demo
+    - baseline
+```
+
+### 4. Enroll minions and apply from the Overstate UI
+
+1. Install the minion, point it at the master, and **accept the key by
+   fingerprint** (`auto_accept` stays off outside dev).
+2. Jobs → new job → target `*` → function `state.apply` → args `baseline`.
+   Dry-run first with `test=True` — Overstate shows the JID for tracing.
+3. Minion detail → **Mine** tab shows `grains.items` / `network.ip_addrs`
+   after the first push, plus `trivy.scan_summary` (severity counts,
+   fixable total, top 20 CVEs) after the first Trivy scan; the
+   **Schedules** tab shows `mine-update-hourly`, `highstate-nightly`,
+   and `trivy-cve-scan`. No extra grants needed: Overstate's eauth
+   already permits `mine.update`, `mine.*`, `state.apply`,
+   `state.highstate`, and `schedule.*` (see `salt-config/api.conf` and
+   Overstate's `docs/deployment.md`).
+
+### 5. What runs itself afterwards
+
+- **Hourly**: `mine-update-hourly` runs `mine.update` (`hours: 1`,
+  `splay: 300`), refreshing the Mine data Overstate browses — on top of
+  Salt's built-in 60-minute `mine_interval`.
+- **Nightly**: `highstate-nightly` runs `state.highstate` at `02:17`
+  (`cron: "17 2 * * *"`, `splay: 900`), so the fleet reconverges without
+  stampeding the master.
+- **Daily**: `trivy-cve-scan` runs `trivy_scan.publish` (`days: 1`,
+  `splay: 600`), refreshing the vulnerability DB, re-scanning OS
+  packages, and pushing a fresh `trivy.scan_summary` to the mine.
+- Tune or disable either in pillar under `baseline:schedule`; disabling a
+  job removes it from the minion (`schedule.absent`) instead of leaving a
+  stale schedule behind.
 
 ---
 
 ## ⚠️ Important Notes
 
-- **USB storage** is blocked by default (`usb` module).
+- **USB storage** is blocked by default (`usb` module; set `baseline:usb:block_storage: false` to allow it).
+- **Automatic `zypper dup` is disabled by default** — set `baseline:updates:auto_dup: true` to enable it.
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
-- Several modules are **disabled by default** — enable them explicitly in pillar.
-- `vmagent` (and other VictoriaMetrics tools) are installed from the openSUSE Build Service Percona repository.
 
 ---
 
@@ -178,7 +253,7 @@ journalctl -u falco -n 20
 Contributions are welcome! Please:
 
 1. Fork the repo
-2. Add or update a module under `salt/baseline/` or `salt/monitoring/`
+2. Add or update a module under `salt/baseline/`
 3. Add corresponding Goss tests in `goss/`
 4. Update pillar examples
 5. Run `make lint` and `make goss-<your-module>`

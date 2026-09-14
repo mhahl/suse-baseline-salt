@@ -84,18 +84,24 @@ rm -f /srv/salt/top.sls
 rm -rf /srv/salt/baseline-repo
 rm -f /srv/pillar/top.sls
 rm -rf /srv/pillar/baseline-repo
+# Nested whole-tree link left by older versions (ln without -T into an
+# existing directory creates /srv/pillar/pillar instead of replacing it)
+rm -f /srv/pillar/pillar
 
-# Make the state modules available directly under /srv/salt
-# (baseline/ and monitoring/ are the top-level state entry points)
+# Make the state module available directly under /srv/salt
+# (baseline/ is the top-level state entry point).
+# NOTE: /srv/salt and /srv/pillar above are real directories, so link the
+# *contents* into them. Linking the whole tree (ln -sfn repo/pillar
+# /srv/pillar) would nest it as /srv/pillar/pillar instead.
 if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
     ln -sfn "$REPO_ROOT/salt/baseline" /srv/salt/baseline
-    ln -sfn "$REPO_ROOT/salt/monitoring" /srv/salt/monitoring
 
-    # Symlink pillar tree so the repository's pillar/top.sls is used
-    ln -sfn "$REPO_ROOT/pillar" /srv/pillar
+    # Symlink pillar files so the repository's pillar/top.sls is used
+    ln -sfn "$REPO_ROOT/pillar/top.sls" /srv/pillar/top.sls
+    ln -sfn "$REPO_ROOT/pillar/baseline.sls" /srv/pillar/baseline.sls
 
-    echo "    Symlinked baseline/ and monitoring/ into /srv/salt"
-    echo "    Symlinked pillar/ into /srv/pillar"
+    echo "    Symlinked baseline/ into /srv/salt"
+    echo "    Symlinked pillar files into /srv/pillar"
 else
     echo "    WARNING: Could not find salt/baseline in repo root."
     echo "    You will need to manually set up /srv/salt and /srv/pillar."
@@ -108,7 +114,6 @@ if [[ -d /srv/salt/baseline ]]; then
 base:
   '*':
     - baseline
-    - monitoring
 EOF
     echo "    Created /srv/salt/top.sls for highstate"
 fi
@@ -126,15 +131,12 @@ echo "     sudo make links"
 echo
 echo "  2. Apply states (local/masterless mode):"
 echo "     sudo make apply                        # applies 'baseline'"
-echo "     sudo make apply MODULE=monitoring.falco"
-echo "     sudo make apply MODULE=monitoring      # all monitoring states"
 echo
 echo "     # Or use the full salt-call target for more control:"
 echo "     sudo make salt-call SALT_ARGS='state.apply baseline test=True'"
 echo
 echo "  3. Run Goss tests:"
 echo "     make goss"
-echo "     make goss-falco"
 echo "     make goss-chrony"
 echo "     ..."
 echo

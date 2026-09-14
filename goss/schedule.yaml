@@ -1,0 +1,21 @@
+# Goss tests for baseline.schedule
+#
+# schedule.present persists jobs to the minion drop-in
+# /etc/salt/minion.d/_schedule.conf, which is what these checks read.
+# Overstate surfaces the same jobs in its Schedules tab via schedule.list.
+
+file:
+  /etc/salt/minion.d/_schedule.conf:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contents:
+      - "mine-update-hourly"
+      - "mine.update"
+      - "highstate-nightly"
+      - "state.highstate"
+      - "17 2 \\* \\* \\*"
+      - "trivy-cve-scan"
+      - "trivy_scan.publish"
+    title: "mine, highstate and trivy schedules are present"

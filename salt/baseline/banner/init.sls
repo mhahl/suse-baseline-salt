@@ -5,4 +5,4 @@ motd_banner:
     - user: root
     - group: root
     - mode: '0644'
-    - template: null
+    - template: False

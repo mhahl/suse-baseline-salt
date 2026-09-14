@@ -7,7 +7,9 @@ on:
       - "goss/banner.yaml"
       - "goss/chrony.yaml"
       - "goss/profile.yaml"
+      - "goss/schedule.yaml"
       - "goss/systemd-resolved.yaml"
+      - "goss/trivy.yaml"
       - "goss/updates.yaml"
       - "goss/usb.yaml"
       - "goss/baseline.yaml"
@@ -23,7 +25,9 @@ on:
       - "goss/banner.yaml"
       - "goss/chrony.yaml"
       - "goss/profile.yaml"
+      - "goss/schedule.yaml"
       - "goss/systemd-resolved.yaml"
+      - "goss/trivy.yaml"
       - "goss/updates.yaml"
       - "goss/usb.yaml"
       - "goss/baseline.yaml"
@@ -49,6 +53,15 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Lint YAML
+        run: |
+          set -euo pipefail
+          if ! command -v yamllint >/dev/null 2>&1; then
+            zypper --non-interactive install --no-recommends python3-pip > /dev/null
+            python3 -m pip install --break-system-packages --quiet yamllint
+          fi
+          yamllint .
 
       - name: Install system packages (SUSE)
         run: |

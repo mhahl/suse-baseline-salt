@@ -6,6 +6,6 @@ file:
     mode: "0644"
     owner: root
     contents:
-      - "It's a UNIX System!"
-      - "I know this!"
+      - "Authorized access only"
+      - "Disconnect immediately if you are not an"
     title: "motd banner is installed"

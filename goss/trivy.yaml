@@ -1,0 +1,11 @@
+# Goss tests for baseline.trivy
+#
+# The daily trivy_scan.publish job persists to the minion drop-in checked
+# in goss/schedule.yaml (one file block per path — a second block here
+# would shadow it). This file covers the scan artifact itself: the full
+# JSON report produced by the initial scan on first apply.
+
+file:
+  /var/cache/trivy/report.json:
+    exists: true
+    title: "trivy vulnerability report exists"

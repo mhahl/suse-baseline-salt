@@ -7,8 +7,12 @@ REPO_ROOT := $(CURDIR)
 # Goss (testing) configuration
 # ------------------------------------------------------------------------------
 GOSS_VERSION ?= v0.4.9
-GOSS_URL := https://github.com/goss-org/goss/releases/download/$(GOSS_VERSION)/goss-linux-amd64
-GOSS := $(shell command -v goss 2>/dev/null || echo ./goss)
+# Local fallback lives under bin/ (NOT ./goss: goss/ is the test directory).
+GOSS_BIN ?= $(REPO_ROOT)/bin/goss
+GOSS_OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+GOSS_ARCH := $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
+GOSS_URL := https://github.com/goss-org/goss/releases/download/$(GOSS_VERSION)/goss-$(GOSS_OS)-$(GOSS_ARCH)
+GOSS := $(shell command -v goss 2>/dev/null || echo $(GOSS_BIN))
 
 # ------------------------------------------------------------------------------
 # Salt configuration for local / masterless usage
@@ -32,8 +36,8 @@ help:
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
 	@echo "  goss                Run all Goss tests (requires goss + target system state)"
-	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-falco, make goss-baseline, make goss-monitoring"
-	@echo "  install-goss        Download a local goss binary to ./goss"
+	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-chrony, make goss-baseline"
+	@echo "  install-goss        Download a local goss binary to ./bin/goss"
 	@echo "  clean               Remove local goss binary"
 	@echo
 	@echo "Salt development (run on the target machine or test VM):"
@@ -44,15 +48,13 @@ help:
 	@echo "  salt-call           Run salt-call locally using this repository directly."
 	@echo "                      Usage:"
 	@echo "                        sudo make salt-call SALT_ARGS='state.apply baseline'"
-	@echo "                        sudo make salt-call SALT_ARGS='state.apply monitoring.falco test=True'"
-	@echo "                        sudo make salt-call SALT_ARGS='state.apply monitoring --log-level=debug'"
+	@echo "                        sudo make salt-call SALT_ARGS='state.apply baseline test=True'"
 	@echo
 	@echo "                      This does NOT require the /srv symlinks (it uses --file-root / --pillar-root)."
 	@echo
 	@echo "  apply               Shortcut for 'state.apply baseline' (or MODULE=...)"
 	@echo "                      Examples:"
 	@echo "                        sudo make apply"
-	@echo "                        sudo make apply MODULE=monitoring.falco"
 	@echo "                        sudo make apply MODULE=baseline test=True"
 	@echo
 	@echo "  highstate           Run state.highstate using the local repo tree."
@@ -72,14 +74,15 @@ goss-%: goss-binary
 install-goss:
 	@if [ -z "$(shell command -v goss)" ]; then \
 		echo "Downloading goss $(GOSS_VERSION)..."; \
-		curl -fsSL $(GOSS_URL) -o goss && chmod +x goss; \
-		echo "Installed ./goss"; \
+		mkdir -p $(REPO_ROOT)/bin; \
+		curl -fsSL $(GOSS_URL) -o $(GOSS_BIN) && chmod +x $(GOSS_BIN); \
+		echo "Installed $(GOSS_BIN)"; \
 	else \
 		echo "goss is already installed at $$(command -v goss)"; \
 	fi
 
 clean:
-	rm -f goss
+	rm -f $(GOSS_BIN)
 
 goss-binary:
 	@$(MAKE) --no-print-directory install-goss > /dev/null 2>&1 || true
@@ -99,8 +102,14 @@ links:
 	fi
 	@echo "==> Creating Salt symlinks"
 	@mkdir -p $(dir $(SALT_SRV)) $(dir $(PILLAR_SRV))
-	@ln -sfn $(REPO_ROOT)/salt $(SALT_SRV)
-	@ln -sfn $(REPO_ROOT)/pillar $(PILLAR_SRV)
+# Drop stale nested links from older layouts, then link the trees themselves.
+# -T (GNU ln, available on the SUSE target) treats the destination as a plain
+# file so an existing /srv/salt directory can never silently become /srv/salt/salt.
+	@rm -f $(SALT_SRV)/salt $(SALT_SRV)/baseline $(SALT_SRV)/top.sls
+	@rm -f $(PILLAR_SRV)/pillar $(PILLAR_SRV)/top.sls
+	@rmdir $(SALT_SRV) $(PILLAR_SRV) 2>/dev/null || true
+	@ln -sfnT $(REPO_ROOT)/salt $(SALT_SRV)
+	@ln -sfnT $(REPO_ROOT)/pillar $(PILLAR_SRV)
 	@echo "    $(SALT_SRV) -> $(REPO_ROOT)/salt"
 	@echo "    $(PILLAR_SRV) -> $(REPO_ROOT)/pillar"
 	@echo "Symlinks installed. Your Salt minion will now see the repo contents under /srv."

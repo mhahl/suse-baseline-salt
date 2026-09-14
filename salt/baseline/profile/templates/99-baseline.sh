@@ -12,7 +12,11 @@ fi
 
 export HISTCONTROL="ignoredups"
 
-readonly HISTFILE HISTFILESIZE HISTSIZE HISTCONTROL HISTTIMEFORMAT PROMPT_COMMAND
+# NOTE: PROMPT_COMMAND and the HIST* variables are deliberately NOT readonly.
+# Marking PROMPT_COMMAND readonly breaks any later snippet that appends to it
+# (direnv, starship, later /etc/profile.d scripts), failing every login shell.
+# Only TMOUT is locked so the idle-timeout cannot be weakened for the session.
+export HISTFILE HISTFILESIZE HISTSIZE HISTCONTROL HISTTIMEFORMAT PROMPT_COMMAND
 
 if [[ -n "${PS1-}" ]]; then
     export TMOUT=1800
