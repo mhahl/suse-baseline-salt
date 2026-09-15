@@ -99,6 +99,11 @@ def test_trivy_init_skips_unsupported_platforms():
     assert "include:" not in render("baseline/trivy/init.sls", DEBIAN)
 
 
+def test_initial_scan_skipped_without_binary():
+    rendered = render("baseline/trivy/scan.sls", SLES)
+    assert "onlyif: test -x /usr/bin/trivy -o -x /usr/local/bin/trivy" in rendered
+
+
 def test_auto_dup_only_on_tumbleweed():
     pillar = {"baseline:updates:auto_dup": True}
     tw = render("baseline/updates/init.sls", TW, pillar)

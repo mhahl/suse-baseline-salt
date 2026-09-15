@@ -152,3 +152,25 @@ def test_scan_builds_os_scan_command_and_caches_report(tmp_path):
     assert out["total"] == 1 and out["minion"] == "web01"
     assert "scanned_at" in out and out["top"][0]["cve"] == "CVE-2024-1"
     assert out["trivy_version"] == "0.74.0"
+
+
+def test_trivy_bin_prefers_managed_path(mod):
+    with mock.patch.object(mod._os.path, "exists", return_value=True):
+        assert mod._trivy_bin() == "/usr/local/bin/trivy"
+    with mock.patch.object(
+        mod._os.path, "exists",
+        side_effect=lambda p: p == "/usr/bin/trivy",
+    ):
+        assert mod._trivy_bin() == "/usr/bin/trivy"
+    with mock.patch.object(mod._os.path, "exists", return_value=False):
+        assert mod._trivy_bin() == "trivy"
+
+
+def test_scan_missing_binary_names_the_fix(tmp_path):
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(tmp_path / "report.json")})
+    mod._trivy_bin = lambda: "/nonexistent/trivy"  # noqa: E731 -- no binary
+    out = mod.scan()
+    assert out["minion"] == "web01"
+    assert "baseline.trivy" in out["error"]
+    assert "trivy" in out["error"]

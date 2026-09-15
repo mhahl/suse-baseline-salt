@@ -8,10 +8,14 @@ trivy_cache_dir:
     - mode: 755
 
 {% if trivy.run_initial_scan %}
+# Skip when the binary is absent (failed/never-ran install): a scan that
+# cannot run only records an error payload. The daily schedule reports the
+# missing binary loudly enough via the module's error message.
 trivy_initial_scan:
   module.run:
     - name: trivy_scan.scan
     - unless: test -s {{ trivy.report_path }}
+    - onlyif: test -x /usr/bin/trivy -o -x /usr/local/bin/trivy
     - require:
       - file: trivy_cache_dir
 {% endif %}

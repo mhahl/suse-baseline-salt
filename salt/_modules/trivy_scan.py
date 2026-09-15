@@ -31,7 +31,9 @@ def _opt(name, default=None):
 
 
 def _trivy_bin():
-    for candidate in ("/usr/bin/trivy", "/usr/local/bin/trivy"):
+    # /usr/local/bin first: that is where the formula installs the pinned
+    # binary, and it must win over a stale distro package at /usr/bin.
+    for candidate in ("/usr/local/bin/trivy", "/usr/bin/trivy"):
         if _os.path.exists(candidate):
             return candidate
     return "trivy"
@@ -124,6 +126,11 @@ def scan(severities=None, top_n=None):
         proc = _subprocess.run(
             cmd, capture_output=True, text=True, timeout=1800,
         )
+    except FileNotFoundError:
+        return {"minion": __grains__.get("id", ""),  # noqa: F821
+                "error": "trivy binary not found at {}: apply "
+                         "baseline.trivy on this minion - its install step "
+                         "failed or never ran".format(binpath)}
     except (OSError, _subprocess.SubprocessError) as exc:
         return {"minion": __grains__.get("id", ""),  # noqa: F821
                 "error": "scan failed to run: {}".format(exc)}
