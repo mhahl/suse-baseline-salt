@@ -169,21 +169,32 @@ Overstate's demo tree (`salt-srv/salt/top.sls` → `demo`) shows the expected
 shape. Keep both trees in git and sync them with Overstate's
 `scripts/sync-file-roots.sh`; the app only ever reads them.
 
-Deploy from a checkout of this repo on the master host:
+Deploy as a git checkout of this repo on the master host, so Overstate's
+Files → **Sync now** button (fetch + `pull --ff-only`) works on it:
 
 ```sh
-sudo make overstate-deploy
+sudo make overstate-checkout
 # Custom roots (e.g. an Overstate dev checkout) — no sudo needed
 # when you own the target. Use an absolute path: make expands `$H`
 # itself, so `~` and `$HOME` do not survive the command line
 # (escape as `$$HOME` if you must use it):
-make overstate-deploy OVERSTATE_SRV=/Users/mhahl/Developer/overstate/salt-srv
+make overstate-checkout OVERSTATE_SRV=/Users/mhahl/Developer/overstate/salt-srv
 ```
 
-The target copies `salt/baseline/`, `salt/_modules/`, and
-`pillar/baseline.sls` into place, creates missing top files with a
-baseline entry, and never touches existing top files — if one lacks a
-baseline entry it prints the exact lines to add. Re-running is safe.
+The target clones (or fast-forwards, never force-updates) this repo at
+`OVERSTATE_SRV`, checks out `OVERSTATE_BRANCH` (default `main`) tracking
+its upstream, leaves the tree clean, and opens permissions to `a+rX` for
+the master workers. A non-empty directory that is not a checkout is never
+touched — move it aside first, diffing for local-only files (pillar
+secrets live outside git by design). Ownership follows the invoking user
+under sudo (`OVERSTATE_OWNER=` overrides); the checkout must stay writable
+by the user the app container runs as, or pulls fail closed. Re-running is
+safe and is exactly what Sync now does from the UI.
+
+Legacy: `make overstate-deploy` copies a subset of the trees plus
+generated top files instead of cloning. Copies are not checkouts, so Sync
+now stays dark on them — use it only for layouts that cannot host a
+checkout.
 
 > **Fresh prod installs:** `install.sh` seeds only the demo files, flattened
 > at `/var/lib/overstate/srv/` (`top.sls` + `demo.sls` at the root) — that

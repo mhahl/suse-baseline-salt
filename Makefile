@@ -25,7 +25,8 @@ PILLAR_SRV ?= /srv/pillar
 # Phony targets
 # ------------------------------------------------------------------------------
 .PHONY: help lint goss install-goss clean \
-        links unlink salt-call apply highstate overstate-deploy overstate-apply
+        links unlink salt-call apply highstate overstate-deploy overstate-apply \
+        overstate-checkout
 
 # ------------------------------------------------------------------------------
 # Help
@@ -60,13 +61,20 @@ help:
 	@echo "  highstate           Run state.highstate using the local repo tree."
 	@echo
 	@echo "Overstate deployment (master file/pillar roots):"
-	@echo "  overstate-deploy    Copy states/pillar into Overstate roots, fix"
-	@echo "                      permissions for the master workers, and print"
-	@echo "                      the fileserver verification commands."
-	@echo "                      (default OVERSTATE_SRV=/var/lib/overstate/srv;"
-	@echo "                      uses sudo only when the target is not writable)"
+	@echo "  overstate-checkout  Clone (or fast-forward) this repo at the roots"
+	@echo "                      so the checkout satisfies the Sync now"
+	@echo "                      contract: tracking branch, clean tree,"
+	@echo "                      world-readable bits for the master workers."
+	@echo "                      (defaults OVERSTATE_SRV=/var/lib/overstate/srv,"
+	@echo "                      OVERSTATE_REPO=<this repo's origin>,"
+	@echo "                      OVERSTATE_BRANCH=main; uses sudo only when"
+	@echo "                      the target is not writable)"
 	@echo "                      Override for other layouts, e.g.:"
-	@echo "                        make overstate-deploy OVERSTATE_SRV=/path/to/salt-srv"
+	@echo "                        make overstate-checkout OVERSTATE_SRV=/path/to/salt-srv"
+	@echo "  overstate-deploy    Legacy plain-copy deploy (subset of trees,"
+	@echo "                      generated top files). Copies are NOT git"
+	@echo "                      checkouts, so Sync now stays dark on them."
+	@echo "  overstate-apply     Alias for overstate-deploy."
 	@echo "  overstate-apply     Alias for overstate-deploy."
 
 # ------------------------------------------------------------------------------
@@ -170,6 +178,17 @@ OVERSTATE_SRV ?= /var/lib/overstate/srv
 OVERSTATE_SALT ?= $(OVERSTATE_SRV)/salt
 OVERSTATE_PILLAR ?= $(OVERSTATE_SRV)/pillar
 OVERSTATE_MASTER ?= salt-master
+# Source for overstate-checkout. Defaults to this checkout's own origin so
+# the deployed tree is literally this repo at the chosen branch.
+OVERSTATE_REPO ?= $(shell git config --get remote.origin.url 2>/dev/null)
+OVERSTATE_BRANCH ?= main
+# Optional owner for the deployed checkout (user or UID). Empty keeps the
+# current owner, except under sudo, where the invoking user takes over so a
+# rootless app container can still pull. The checkout must be writable by
+# whatever user the app container runs as, or Sync now fails closed; a
+# different owner there also trips git's dubious-ownership guard, which only
+# matching ownership fixes.
+OVERSTATE_OWNER ?=
 
 overstate-deploy:
 	@if [ -z "$(OVERSTATE_SRV)" ]; then \
@@ -210,3 +229,86 @@ overstate-deploy:
 	@echo "  # and the master's file_roots before re-running this target."
 
 overstate-apply: overstate-deploy
+
+# ------------------------------------------------------------------------------
+# Overstate checkout (Sync now compatible)
+# ------------------------------------------------------------------------------
+# overstate-deploy copies files; copies are not git checkouts, so Overstate's
+# Sync now button (git fetch + pull --ff-only on FILE_ROOTS) refuses them.
+# This target instead places a real tracking checkout at OVERSTATE_SRV, which
+# is exactly the layout Overstate documents: the app reads
+# <srv>/salt (FILE_ROOTS) and Sync now fast-forwards the whole checkout,
+# while the master serves <srv>/salt + <srv>/pillar read-only.
+#
+# Fail-closed throughout: an existing checkout is only ever fast-forwarded;
+# diverged branches and dirty trees refuse with the git reason. A non-empty
+# directory that is NOT a checkout is never touched — move it aside first
+# (and diff it: local-only pillar secrets live outside git by design).
+overstate-checkout:
+	@if [ -z "$(OVERSTATE_SRV)" ]; then \
+		echo "error: OVERSTATE_SRV is empty" >&2; exit 1; \
+	fi
+	@if [ -z "$(OVERSTATE_REPO)" ]; then \
+		echo "error: OVERSTATE_REPO is empty (no origin on this checkout?)" >&2; exit 1; \
+	fi
+	@if { [ -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(OVERSTATE_SRV)" ]; } || \
+	   { [ ! -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(dir $(OVERSTATE_SRV))" ]; }; then \
+		echo "==> Elevating with sudo to write $(OVERSTATE_SRV)..."; \
+		sudo $(MAKE) --no-print-directory overstate-checkout \
+			OVERSTATE_SRV="$(OVERSTATE_SRV)" OVERSTATE_REPO="$(OVERSTATE_REPO)" \
+			OVERSTATE_BRANCH="$(OVERSTATE_BRANCH)" OVERSTATE_OWNER="$(OVERSTATE_OWNER)"; \
+		exit $$?; \
+	fi
+	@echo "==> Overstate checkout at $(OVERSTATE_SRV) from $(OVERSTATE_REPO) [$(OVERSTATE_BRANCH)]"
+	@if [ -d "$(OVERSTATE_SRV)/.git" ]; then \
+		echo "    existing checkout: fetching + fast-forwarding only"; \
+		git -C "$(OVERSTATE_SRV)" fetch --prune origin; \
+		cur=$$(git -C "$(OVERSTATE_SRV)" symbolic-ref --quiet --short HEAD || echo detached); \
+		if [ "$$cur" != "$(OVERSTATE_BRANCH)" ]; then \
+			if git -C "$(OVERSTATE_SRV)" show-ref --quiet --verify "refs/heads/$(OVERSTATE_BRANCH)"; then \
+				git -C "$(OVERSTATE_SRV)" checkout "$(OVERSTATE_BRANCH)"; \
+			else \
+				git -C "$(OVERSTATE_SRV)" checkout -b "$(OVERSTATE_BRANCH)" --track "origin/$(OVERSTATE_BRANCH)"; \
+			fi; \
+		fi; \
+		git -C "$(OVERSTATE_SRV)" pull --ff-only; \
+	else \
+		if [ -e "$(OVERSTATE_SRV)" ] && [ -n "$$(ls -A "$(OVERSTATE_SRV)")" ]; then \
+			echo "error: $(OVERSTATE_SRV) exists, is not a git checkout, and is not empty." >&2; \
+			echo "Refusing to touch it: move it aside first, diffing for local-only" >&2; \
+			echo "files (pillar secrets) before you do." >&2; \
+			exit 1; \
+		fi; \
+		mkdir -p "$(OVERSTATE_SRV)"; \
+		git clone --branch "$(OVERSTATE_BRANCH)" -- "$(OVERSTATE_REPO)" "$(OVERSTATE_SRV)"; \
+	fi
+# Ownership first (pulls run as the app user), then world-readable bits so
+# the non-root master workers traverse the bind mount — same a+rX rule as
+# the copy path: a root umask of 027 otherwise hides the tree again.
+	@owner="$(OVERSTATE_OWNER)"; \
+	if [ -z "$$owner" ] && [ -n "$$SUDO_USER" ] && [ "$$SUDO_USER" != "root" ]; then \
+		owner="$$SUDO_USER"; \
+	fi; \
+	if [ -n "$$owner" ]; then \
+		chown -R "$$owner" "$(OVERSTATE_SRV)"; \
+		echo "    owner: $$owner"; \
+	fi
+	@chmod -R a+rX "$(OVERSTATE_SRV)"
+	@echo "    checkout: $$(git -C "$(OVERSTATE_SRV)" rev-parse --short HEAD) tracking $$(git -C "$(OVERSTATE_SRV)" rev-parse --abbrev-ref --symbolic-full-name "@{u}")"
+	@dirty=$$(git -C "$(OVERSTATE_SRV)" status --porcelain | wc -l); \
+	if [ "$$dirty" != "0" ]; then \
+		echo "    WARNING: $$dirty dirty file(s); Sync now refuses until clean." >&2; \
+	fi
+	@if [ ! -f "$(OVERSTATE_SRV)/salt/top.sls" ]; then \
+		echo "    WARNING: no salt/top.sls — the master serves nothing without it." >&2; \
+	fi
+	@if [ ! -f "$(OVERSTATE_SRV)/pillar/top.sls" ]; then \
+		echo "    WARNING: no pillar/top.sls." >&2; \
+	fi
+	@echo "Checkout ready. Verify the master serves the tree, then apply:"
+	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.update"
+	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.file_list saltenv=base | grep -c baseline"
+	@echo "  # nonzero count -> apply from Overstate Jobs: state.apply baseline (or highstate)."
+	@echo "  # zero count -> the container does not see $(OVERSTATE_SRV): check its bind mounts"
+	@echo "  # and the master's file_roots before re-running this target."
+	@echo "  # Afterwards, Overstate Files -> Sync now fast-forwards this checkout."
