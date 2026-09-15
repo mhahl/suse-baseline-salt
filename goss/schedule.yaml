@@ -4,10 +4,10 @@
 # /etc/salt/minion.d/_schedule.conf, which is what these checks read.
 # Overstate surfaces the same jobs in its Schedules tab via schedule.list.
 # The nightly highstate uses a cron expression, which needs the croniter
-# module (python3-croniter) on the minion.
+# module (python313-croniter) on the minion.
 
 package:
-  python3-croniter:
+  python313-croniter:
     installed: true
     title: "croniter module for cron schedules is installed"
 

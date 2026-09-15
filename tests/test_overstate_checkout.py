@@ -82,6 +82,7 @@ def test_checkout_creates_tracking_checkout(source_repo, tmp_path):
     assert (srv / "salt" / "baseline" / "init.sls").is_file()
     assert (srv / "salt" / "top.sls").is_file()
     assert (srv / "pillar" / "baseline.sls").is_file()
+    assert "owner:" in proc.stdout, "target must report checkout ownership"
 
 
 def test_checkout_is_world_readable(source_repo, tmp_path):

@@ -10,10 +10,10 @@
 
 {# The nightly highstate uses a cron expression, which the minion only
    evaluates with the croniter module installed (source package
-   python-croniter, binary python3-croniter on SUSE). #}
+   python-croniter, binary python313-croniter on SUSE). #}
 schedule_croniter_package:
   pkg.installed:
-    - name: python3-croniter
+    - name: python313-croniter
 
 {% if enabled and mine_cfg.get('enabled', True) %}
 baseline_mine_update:

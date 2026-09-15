@@ -186,10 +186,12 @@ The target clones (or fast-forwards, never force-updates) this repo at
 its upstream, leaves the tree clean, and opens permissions to `a+rX` for
 the master workers. A non-empty directory that is not a checkout is never
 touched — move it aside first, diffing for local-only files (pillar
-secrets live outside git by design). Ownership follows the invoking user
-under sudo (`OVERSTATE_OWNER=` overrides); the checkout must stay writable
-by the user the app container runs as, or pulls fail closed. Re-running is
-safe and is exactly what Sync now does from the UI.
+secrets live outside git by design). Ownership must match the app
+container user, or pulls fail closed (git's dubious-ownership guard
+accepts only matching UIDs): `root:root` on rootful deployments, your own
+user on rootless/dev checkouts. The target reports the owner and never
+changes it unless `OVERSTATE_OWNER=` is set. Re-running is safe and is
+exactly what Sync now does from the UI.
 
 Legacy: `make overstate-deploy` copies a subset of the trees plus
 generated top files instead of cloning. Copies are not checkouts, so Sync

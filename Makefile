@@ -182,12 +182,13 @@ OVERSTATE_MASTER ?= salt-master
 # the deployed tree is literally this repo at the chosen branch.
 OVERSTATE_REPO ?= $(shell git config --get remote.origin.url 2>/dev/null)
 OVERSTATE_BRANCH ?= main
-# Optional owner for the deployed checkout (user or UID). Empty keeps the
-# current owner, except under sudo, where the invoking user takes over so a
-# rootless app container can still pull. The checkout must be writable by
-# whatever user the app container runs as, or Sync now fails closed; a
-# different owner there also trips git's dubious-ownership guard, which only
-# matching ownership fixes.
+# Optional owner for the deployed checkout (user or UID). Empty changes
+# nothing: the checkout must be owned by the same UID the app container
+# runs as (Sync now pulls as that user; anything else trips git's
+# dubious-ownership guard, and only matching ownership fixes it). That is
+# root:root on rootful deployments (the quadlets set no User=) and the
+# invoking user on rootless/dev checkouts. Set OVERSTATE_OWNER only when
+# your layout differs from whoever runs this target.
 OVERSTATE_OWNER ?=
 
 overstate-deploy:
@@ -282,16 +283,15 @@ overstate-checkout:
 		mkdir -p "$(OVERSTATE_SRV)"; \
 		git clone --branch "$(OVERSTATE_BRANCH)" -- "$(OVERSTATE_REPO)" "$(OVERSTATE_SRV)"; \
 	fi
-# Ownership first (pulls run as the app user), then world-readable bits so
-# the non-root master workers traverse the bind mount — same a+rX rule as
-# the copy path: a root umask of 027 otherwise hides the tree again.
-	@owner="$(OVERSTATE_OWNER)"; \
-	if [ -z "$$owner" ] && [ -n "$$SUDO_USER" ] && [ "$$SUDO_USER" != "root" ]; then \
-		owner="$$SUDO_USER"; \
-	fi; \
-	if [ -n "$$owner" ]; then \
-		chown -R "$$owner" "$(OVERSTATE_SRV)"; \
-		echo "    owner: $$owner"; \
+# World-readable bits so the non-root master workers traverse the bind
+# mount — same a+rX rule as the copy path: a root umask of 027 otherwise
+# hides the tree again. Ownership is reported, never changed here: it must
+# already match the app container user (see OVERSTATE_OWNER above).
+	@owner="$$(stat -c '%U (%u)' "$(OVERSTATE_SRV)" 2>/dev/null || stat -f '%Su (%u)' "$(OVERSTATE_SRV)")"; \
+	echo "    owner: $$owner (must match the app container user for Sync now)"; \
+	if [ -n "$(OVERSTATE_OWNER)" ]; then \
+		chown -R "$(OVERSTATE_OWNER)" "$(OVERSTATE_SRV)"; \
+		echo "    owner forced to: $(OVERSTATE_OWNER)"; \
 	fi
 	@chmod -R a+rX "$(OVERSTATE_SRV)"
 	@echo "    checkout: $$(git -C "$(OVERSTATE_SRV)" rev-parse --short HEAD) tracking $$(git -C "$(OVERSTATE_SRV)" rev-parse --abbrev-ref --symbolic-full-name "@{u}")"
