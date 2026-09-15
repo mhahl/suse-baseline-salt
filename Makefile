@@ -25,7 +25,7 @@ PILLAR_SRV ?= /srv/pillar
 # Phony targets
 # ------------------------------------------------------------------------------
 .PHONY: help lint goss install-goss clean \
-        links unlink salt-call apply highstate overstate-deploy
+        links unlink salt-call apply highstate overstate-deploy overstate-apply
 
 # ------------------------------------------------------------------------------
 # Help
@@ -36,7 +36,7 @@ help:
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
 	@echo "  goss                Run all Goss tests (requires goss + target system state)"
-	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-chrony, make goss-baseline"
+	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-timesyncd, make goss-baseline"
 	@echo "  install-goss        Download a local goss binary to ./bin/goss"
 	@echo "  clean               Remove local goss binary"
 	@echo
@@ -60,11 +60,14 @@ help:
 	@echo "  highstate           Run state.highstate using the local repo tree."
 	@echo
 	@echo "Overstate deployment (master file/pillar roots):"
-	@echo "  overstate-deploy    Copy states/pillar into Overstate roots"
+	@echo "  overstate-deploy    Copy states/pillar into Overstate roots, fix"
+	@echo "                      permissions for the master workers, and print"
+	@echo "                      the fileserver verification commands."
 	@echo "                      (default OVERSTATE_SRV=/var/lib/overstate/srv;"
 	@echo "                      uses sudo only when the target is not writable)"
 	@echo "                      Override for other layouts, e.g.:"
 	@echo "                        make overstate-deploy OVERSTATE_SRV=/path/to/salt-srv"
+	@echo "  overstate-apply     Alias for overstate-deploy."
 
 # ------------------------------------------------------------------------------
 # Testing targets (existing)
@@ -154,12 +157,19 @@ highstate:
 # Overstate deployment (master file/pillar roots)
 # ------------------------------------------------------------------------------
 # Overstate serves states from <srv>/salt and pillar from <srv>/pillar, where
-# <srv> is /var/lib/overstate/srv on prod (bind-mounted into the master
-# container). Plain copies are used deliberately, never symlinks: a link
-# pointing outside the bind mount dangles inside the container.
+# <srv> is /var/lib/overstate/srv on prod. That host dir is bind-mounted
+# READ-ONLY into the cdalvaro-layout master container at
+# /home/salt/data/srv (the master's file_roots/pillar_roots), so:
+#  - plain copies are used deliberately, never symlinks: a link pointing
+#    outside the bind mount dangles inside the container;
+#  - deployed trees are opened to a+rX below: a root umask of 027 lands
+#    files as 640/750, which the (non-root) master workers cannot
+#    traverse — fileserver.file_list then silently omits the whole tree
+#    and applies fail with "No matching sls found".
 OVERSTATE_SRV ?= /var/lib/overstate/srv
 OVERSTATE_SALT ?= $(OVERSTATE_SRV)/salt
 OVERSTATE_PILLAR ?= $(OVERSTATE_SRV)/pillar
+OVERSTATE_MASTER ?= salt-master
 
 overstate-deploy:
 	@if [ -z "$(OVERSTATE_SRV)" ]; then \
@@ -177,6 +187,7 @@ overstate-deploy:
 	@cp -r $(REPO_ROOT)/salt/baseline $(OVERSTATE_SALT)/baseline
 	@cp -f $(REPO_ROOT)/salt/_modules/*.py $(OVERSTATE_SALT)/_modules/
 	@cp -f $(REPO_ROOT)/pillar/baseline.sls $(OVERSTATE_PILLAR)/baseline.sls
+	@chmod -R a+rX $(OVERSTATE_SALT)/baseline $(OVERSTATE_SALT)/_modules $(OVERSTATE_PILLAR)
 	@if [ ! -f $(OVERSTATE_PILLAR)/top.sls ]; then \
 		cp $(REPO_ROOT)/pillar/top.sls $(OVERSTATE_PILLAR)/top.sls; \
 		echo "    installed pillar top.sls"; \
@@ -191,4 +202,11 @@ overstate-deploy:
 		echo "    NOTE: $(OVERSTATE_SALT)/top.sls exists without a baseline entry:"; \
 		echo "          add '- baseline' under base '*' (nightly highstate needs it)."; \
 	fi
-	@echo "Deployed. Apply from Overstate Jobs: state.apply baseline (or highstate)."
+	@echo "Deployed. Verify the master serves the tree, then apply:"
+	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.update"
+	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.file_list saltenv=base | grep -c baseline"
+	@echo "  # nonzero count -> apply from Overstate Jobs: state.apply baseline (or highstate)."
+	@echo "  # zero count -> the container does not see $(OVERSTATE_SRV): check its bind mounts"
+	@echo "  # and the master's file_roots before re-running this target."
+
+overstate-apply: overstate-deploy
