@@ -82,6 +82,30 @@ def test_netconfig_guard_only_on_suse(grains):
     assert "NETCONFIG_DNS_POLICY" not in other
 
 
+def test_restorecon_only_when_selinux_enforced():
+    enforcing = render_init(
+        {
+            "os_family": "RedHat",
+            "selinux": {"enabled": True, "enforced": True},
+        }
+    )
+    assert "restorecon -Rv /run/systemd/resolve" in enforcing
+    assert "onlyif: command -v restorecon" in enforcing
+
+    permissive = render_init(
+        {
+            "os_family": "RedHat",
+            "selinux": {"enabled": True, "enforced": False},
+        }
+    )
+    assert "restorecon" not in permissive
+
+    suse = render_init(
+        {"os": "openSUSE Leap", "os_family": "Suse", "osmajorrelease": 15}
+    )
+    assert "restorecon" not in suse
+
+
 def test_init_wires_selected_package_and_keeps_stub_symlink():
     leap = render_init({"os": "openSUSE Leap", "os_family": "Suse",
                         "osmajorrelease": 15})

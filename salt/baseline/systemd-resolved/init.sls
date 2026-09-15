@@ -62,3 +62,22 @@ resolved_service:
       - pkg: systemd_resolved_package
       - file: resolv_conf_symlink
       - file: resolved_config
+
+{% if grains.get('selinux', {}).get('enforced', False) %}
+# SELinux-enforcing hosts: the runtime dir and the stub files the daemon
+# creates under it inherit tmpfs context, so DNS breaks until contexts are
+# restored to policy defaults. Run restorecon here — after the service is
+# up and again on every restart — instead of a manual
+# `sudo restorecon -Rv /run/systemd/resolve`. The onlyif keeps hosts
+# without policycoreutils a green no-op; non-enforcing hosts skip this
+# state entirely via the grains guard above.
+resolved_selinux_restorecon:
+  cmd.run:
+    - name: restorecon -Rv /run/systemd/resolve
+    - onlyif: command -v restorecon
+    - require:
+      - file: resolv_conf_symlink
+      - service: resolved_service
+    - watch:
+      - service: resolved_service
+{% endif %}
