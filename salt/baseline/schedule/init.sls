@@ -9,12 +9,12 @@
 {% set highstate_cfg = sched.get('highstate', {}) %}
 {% set sync_cfg = sched.get('sync_modules', {}) %}
 
-{# The nightly highstate uses a cron expression, which the minion only
-   evaluates with the croniter module installed (source package
-   python-croniter, binary python313-croniter on SUSE). #}
+{# python3-croniter is the virtual name: python313-croniter Provides it
+   on Tumbleweed/Leap 16; Leap 15.x ships python3-croniter itself. A
+   hard-coded python313-croniter fails pkg.installed on Leap 15. #}
 schedule_croniter_package:
   pkg.installed:
-    - name: python313-croniter
+    - name: python3-croniter
 
 {% if enabled and mine_cfg.get('enabled', True) %}
 baseline_mine_update:

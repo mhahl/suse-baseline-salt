@@ -24,9 +24,8 @@ PILLAR_SRV ?= /srv/pillar
 # ------------------------------------------------------------------------------
 # Phony targets
 # ------------------------------------------------------------------------------
-.PHONY: help lint goss install-goss clean \
-        links unlink salt-call apply highstate overstate-deploy overstate-apply \
-        overstate-checkout
+.PHONY: help lint test goss install-goss clean \
+        links unlink salt-call apply highstate overstate-checkout
 
 # ------------------------------------------------------------------------------
 # Help
@@ -36,6 +35,7 @@ help:
 	@echo
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
+	@echo "  test                Run pytest unit/render tests"
 	@echo "  goss                Run all Goss tests (requires goss + target system state)"
 	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-timesyncd, make goss-baseline"
 	@echo "  install-goss        Download a local goss binary to ./bin/goss"
@@ -60,7 +60,7 @@ help:
 	@echo
 	@echo "  highstate           Run state.highstate using the local repo tree."
 	@echo
-	@echo "Overstate deployment (master file/pillar roots):"
+	@echo "Overstate checkout (master file/pillar roots):"
 	@echo "  overstate-checkout  Clone (or fast-forward) this repo at the roots"
 	@echo "                      so the checkout satisfies the Sync now"
 	@echo "                      contract: tracking branch, clean tree,"
@@ -71,17 +71,15 @@ help:
 	@echo "                      the target is not writable)"
 	@echo "                      Override for other layouts, e.g.:"
 	@echo "                        make overstate-checkout OVERSTATE_SRV=/path/to/salt-srv"
-	@echo "  overstate-deploy    Legacy plain-copy deploy (subset of trees,"
-	@echo "                      generated top files). Copies are NOT git"
-	@echo "                      checkouts, so Sync now stays dark on them."
-	@echo "  overstate-apply     Alias for overstate-deploy."
-	@echo "  overstate-apply     Alias for overstate-deploy."
 
 # ------------------------------------------------------------------------------
 # Testing targets (existing)
 # ------------------------------------------------------------------------------
 lint:
 	yamllint .
+
+test:
+	python3 -m pytest tests/ -q
 
 goss: goss-binary
 	$(GOSS) --gossfile goss/goss.yaml validate
@@ -123,8 +121,8 @@ links:
 # Drop stale nested links from older layouts, then link the trees themselves.
 # -T (GNU ln, available on the SUSE target) treats the destination as a plain
 # file so an existing /srv/salt directory can never silently become /srv/salt/salt.
-	@rm -f $(SALT_SRV)/salt $(SALT_SRV)/baseline $(SALT_SRV)/top.sls
-	@rm -f $(PILLAR_SRV)/pillar $(PILLAR_SRV)/top.sls
+	@rm -f $(SALT_SRV)/salt $(SALT_SRV)/baseline $(SALT_SRV)/_modules $(SALT_SRV)/top.sls
+	@rm -f $(PILLAR_SRV)/pillar $(PILLAR_SRV)/top.sls $(PILLAR_SRV)/baseline.sls
 	@rmdir $(SALT_SRV) $(PILLAR_SRV) 2>/dev/null || true
 	@ln -sfnT $(REPO_ROOT)/salt $(SALT_SRV)
 	@ln -sfnT $(REPO_ROOT)/pillar $(PILLAR_SRV)
@@ -162,21 +160,23 @@ highstate:
 	@$(MAKE) --no-print-directory salt-call SALT_ARGS="state.highstate $(SALT_ARGS)"
 
 # ------------------------------------------------------------------------------
-# Overstate deployment (master file/pillar roots)
+# Overstate checkout (master file/pillar roots, Sync now compatible)
 # ------------------------------------------------------------------------------
 # Overstate serves states from <srv>/salt and pillar from <srv>/pillar, where
 # <srv> is /var/lib/overstate/srv on prod. That host dir is bind-mounted
 # READ-ONLY into the cdalvaro-layout master container at
 # /home/salt/data/srv (the master's file_roots/pillar_roots), so:
-#  - plain copies are used deliberately, never symlinks: a link pointing
+#  - this target places a real tracking checkout at OVERSTATE_SRV, which is
+#    exactly the layout Overstate documents: the app reads <srv>/salt
+#    (FILE_ROOTS) and Sync now fast-forwards the whole checkout, while the
+#    master serves <srv>/salt + <srv>/pillar read-only. Plain copies and
+#    symlinks are not used: copies break Sync now, and a link pointing
 #    outside the bind mount dangles inside the container;
-#  - deployed trees are opened to a+rX below: a root umask of 027 lands
+#  - the checkout is opened to a+rX below: a root umask of 027 lands
 #    files as 640/750, which the (non-root) master workers cannot
 #    traverse — fileserver.file_list then silently omits the whole tree
 #    and applies fail with "No matching sls found".
 OVERSTATE_SRV ?= /var/lib/overstate/srv
-OVERSTATE_SALT ?= $(OVERSTATE_SRV)/salt
-OVERSTATE_PILLAR ?= $(OVERSTATE_SRV)/pillar
 OVERSTATE_MASTER ?= salt-master
 # Source for overstate-checkout. Defaults to this checkout's own origin so
 # the deployed tree is literally this repo at the chosen branch.
@@ -191,56 +191,6 @@ OVERSTATE_BRANCH ?= main
 # your layout differs from whoever runs this target.
 OVERSTATE_OWNER ?=
 
-overstate-deploy:
-	@if [ -z "$(OVERSTATE_SRV)" ]; then \
-		echo "error: OVERSTATE_SRV is empty" >&2; exit 1; \
-	fi
-	@if { [ -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(OVERSTATE_SRV)" ]; } || \
-	   { [ ! -e "$(OVERSTATE_SRV)" ] && [ ! -w "$(dir $(OVERSTATE_SRV))" ]; }; then \
-		echo "==> Elevating with sudo to write $(OVERSTATE_SRV)..."; \
-		sudo $(MAKE) --no-print-directory overstate-deploy OVERSTATE_SRV="$(OVERSTATE_SRV)"; \
-		exit $$?; \
-	fi
-	@echo "==> Deploying baseline into Overstate roots: $(OVERSTATE_SRV)"
-	@mkdir -p $(OVERSTATE_SALT) $(OVERSTATE_PILLAR) $(OVERSTATE_SALT)/_modules
-	@rm -rf $(OVERSTATE_SALT)/baseline
-	@cp -r $(REPO_ROOT)/salt/baseline $(OVERSTATE_SALT)/baseline
-	@cp -f $(REPO_ROOT)/salt/_modules/*.py $(OVERSTATE_SALT)/_modules/
-	@cp -f $(REPO_ROOT)/pillar/baseline.sls $(OVERSTATE_PILLAR)/baseline.sls
-	@chmod -R a+rX $(OVERSTATE_SALT)/baseline $(OVERSTATE_SALT)/_modules $(OVERSTATE_PILLAR)
-	@if [ ! -f $(OVERSTATE_PILLAR)/top.sls ]; then \
-		cp $(REPO_ROOT)/pillar/top.sls $(OVERSTATE_PILLAR)/top.sls; \
-		echo "    installed pillar top.sls"; \
-	elif ! grep -qE '^[[:space:]]*-[[:space:]]*baseline[[:space:]]*$$' $(OVERSTATE_PILLAR)/top.sls; then \
-		echo "    NOTE: $(OVERSTATE_PILLAR)/top.sls exists without a baseline entry:"; \
-		echo "          add '- baseline' under base '*' to serve pillar."; \
-	fi
-	@if [ ! -f $(OVERSTATE_SALT)/top.sls ]; then \
-		printf "base:\n  '*':\n    - baseline\n" > $(OVERSTATE_SALT)/top.sls; \
-		echo "    created salt top.sls with baseline"; \
-	elif ! grep -qE '^[[:space:]]*-[[:space:]]*baseline[[:space:]]*$$' $(OVERSTATE_SALT)/top.sls; then \
-		echo "    NOTE: $(OVERSTATE_SALT)/top.sls exists without a baseline entry:"; \
-		echo "          add '- baseline' under base '*' (nightly highstate needs it)."; \
-	fi
-	@echo "Deployed. Verify the master serves the tree, then apply:"
-	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.update"
-	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.file_list saltenv=base | grep -c baseline"
-	@echo "  # nonzero count -> apply from Overstate Jobs: state.apply baseline (or highstate)."
-	@echo "  # zero count -> the container does not see $(OVERSTATE_SRV): check its bind mounts"
-	@echo "  # and the master's file_roots before re-running this target."
-
-overstate-apply: overstate-deploy
-
-# ------------------------------------------------------------------------------
-# Overstate checkout (Sync now compatible)
-# ------------------------------------------------------------------------------
-# overstate-deploy copies files; copies are not git checkouts, so Overstate's
-# Sync now button (git fetch + pull --ff-only on FILE_ROOTS) refuses them.
-# This target instead places a real tracking checkout at OVERSTATE_SRV, which
-# is exactly the layout Overstate documents: the app reads
-# <srv>/salt (FILE_ROOTS) and Sync now fast-forwards the whole checkout,
-# while the master serves <srv>/salt + <srv>/pillar read-only.
-#
 # Fail-closed throughout: an existing checkout is only ever fast-forwarded;
 # diverged branches and dirty trees refuse with the git reason. A non-empty
 # directory that is NOT a checkout is never touched — move it aside first
@@ -284,8 +234,8 @@ overstate-checkout:
 		git clone --branch "$(OVERSTATE_BRANCH)" -- "$(OVERSTATE_REPO)" "$(OVERSTATE_SRV)"; \
 	fi
 # World-readable bits so the non-root master workers traverse the bind
-# mount — same a+rX rule as the copy path: a root umask of 027 otherwise
-# hides the tree again. Ownership is reported, never changed here: it must
+# mount: a root umask of 027 otherwise hides the tree again.
+# Ownership is reported, never changed here: it must
 # already match the app container user (see OVERSTATE_OWNER above).
 	@owner="$$(stat -c '%U (%u)' "$(OVERSTATE_SRV)" 2>/dev/null || stat -f '%Su (%u)' "$(OVERSTATE_SRV)")"; \
 	echo "    owner: $$owner (must match the app container user for Sync now)"; \

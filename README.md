@@ -68,6 +68,7 @@ sudo ./scripts/setup-test-vm.sh
 
 # Run tests
 make lint
+make test
 make goss
 make goss-timesyncd
 ```
@@ -77,9 +78,14 @@ make goss-timesyncd
 | Command                    | Description                     |
 |---------------------------|---------------------------------|
 | `make lint`               | Run yamllint                    |
+| `make test`               | Run pytest unit/render tests    |
 | `make goss`               | Run all Goss tests              |
 | `make goss-<component>`   | Run tests for a specific module |
 | `make install-goss`       | Download Goss binary            |
+| `make apply`              | `state.apply baseline` locally  |
+| `make highstate`          | `state.highstate` locally       |
+| `make links`              | Symlink `/srv/salt` + `/srv/pillar` to this repo |
+| `make overstate-checkout` | Clone/fast-forward this repo at the Overstate roots |
 
 See the [Makefile](Makefile) for more options.
 
@@ -89,7 +95,7 @@ Goss tests run in containers on `opensuse-tumbleweed` runners:
 
 - **Baseline** tests: [`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)
 
-The workflow is triggered on push/PR to relevant paths (states, pillar, and the corresponding Goss test files). It lints all YAML with yamllint before applying states and running Goss.
+The workflow is triggered on push/PR to relevant paths (states, custom modules, tests, pillar, and the corresponding Goss test files). It lints YAML, runs `pytest`, then applies states (`--retcode-passthrough` so a failed apply fails the job) and runs Goss.
 
 ---
 
@@ -116,10 +122,14 @@ pillar/
 └── top.sls
 
 tests/
+├── test_overstate_checkout.py    # overstate-checkout Makefile contract
+├── test_schedule_croniter.py     # croniter package + highstate cron require
+├── test_schedule_sync_modules.py # daily saltutil.sync_modules job
 ├── test_timesyncd.py             # timesyncd drop-in + init render tests
 ├── test_trivy_map.py             # trivy platform/arch selection render tests
 ├── test_trivy_scan.py            # pytest unit tests for the trivy_scan module
-└── test_systemd_resolved_map.py  # resolved package selection render tests
+├── test_systemd_resolved_map.py  # resolved package selection render tests
+└── test_usb.py                   # USB block_storage deploy/undeploy
 ```
 
 ---
@@ -192,11 +202,6 @@ accepts only matching UIDs): `root:root` on rootful deployments, your own
 user on rootless/dev checkouts. The target reports the owner and never
 changes it unless `OVERSTATE_OWNER=` is set. Re-running is safe and is
 exactly what Sync now does from the UI.
-
-Legacy: `make overstate-deploy` copies a subset of the trees plus
-generated top files instead of cloning. Copies are not checkouts, so Sync
-now stays dark on them — use it only for layouts that cannot host a
-checkout.
 
 > **Fresh prod installs:** `install.sh` seeds only the demo files, flattened
 > at `/var/lib/overstate/srv/` (`top.sls` + `demo.sls` at the root) — that
@@ -277,7 +282,7 @@ base:
 
 ## ⚠️ Important Notes
 
-- **USB storage** is blocked by default (`usb` module; set `baseline:usb:block_storage: false` to allow it).
+- **USB storage** is blocked by default (`usb` module; set `baseline:usb:block_storage: false` to allow it — that removes a previously deployed blacklist file).
 - **Automatic `zypper dup` is disabled by default** — set `baseline:updates:auto_dup: true` to enable it.
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
 
@@ -298,7 +303,7 @@ Contributions are welcome! Please:
 2. Add or update a module under `salt/baseline/`
 3. Add corresponding Goss tests in `goss/`
 4. Update pillar examples
-5. Run `make lint` and `make goss-<your-module>`
+5. Run `make lint`, `make test`, and `make goss-<your-module>`
 
 ### Naming conventions
 

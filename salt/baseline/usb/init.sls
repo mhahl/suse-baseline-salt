@@ -16,4 +16,8 @@ usb_storage_block:
     - onlyif: lsmod | grep -qE 'usb_storage|uas'
     - require:
       - file: usb_storage_block
+{% else %}
+usb_storage_block:
+  file.absent:
+    - name: /etc/modprobe.d/99-baseline-usb-storage.conf
 {% endif %}

@@ -1,4 +1,4 @@
-"""Unit tests for overstate/trivy/_modules/trivy_scan.py.
+"""Unit tests for salt/_modules/trivy_scan.py.
 
 Pure stdlib + pytest; no Salt runtime needed. The module under test only
 touches Salt dunders (``__pillar__``, ``__grains__``, ``__salt__``) inside
@@ -164,6 +164,27 @@ def test_trivy_bin_prefers_managed_path(mod):
         assert mod._trivy_bin() == "/usr/bin/trivy"
     with mock.patch.object(mod._os.path, "exists", return_value=False):
         assert mod._trivy_bin() == "trivy"
+
+
+def test_scan_failed_run_does_not_republish_stale_report(tmp_path):
+    report = {"Results": [{"Vulnerabilities": [vuln("CVE-2024-1", "CRITICAL")]}]}
+    report_file = tmp_path / "report.json"
+    report_file.write_text(json.dumps(report), encoding="utf-8")
+
+    def fake_run(cmd, **kwargs):
+        return mock.Mock(returncode=1, stdout="", stderr="db update failed")
+
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(report_file)})
+    mod._trivy_bin = lambda: "/usr/bin/trivy"  # noqa: E731 -- stub lookup
+    with mock.patch.object(mod._subprocess, "run", side_effect=fake_run):
+        out = mod.scan()
+    assert out["minion"] == "web01"
+    assert "trivy exited 1" in out["error"]
+    assert "total" not in out
+    assert "top" not in out
+    assert "scanned_at" not in out
+    assert "db update failed" in out["stderr_tail"]
 
 
 def test_scan_missing_binary_names_the_fix(tmp_path):

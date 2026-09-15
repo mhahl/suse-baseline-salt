@@ -3,8 +3,8 @@
 Scheduled daily via :func:`publish`, which runs a ``trivy rootfs /``
 OS-package scan, caches the full JSON report on the minion, and pushes
 a small summary dict to the mine under the ``trivy.scan_summary`` key.
-The mine never carries the full report. All behavior is driven by the
-``trivy`` pillar (see ``pillar.example``).
+The mine never carries the full report. All behavior is driven by
+``baseline:trivy`` in ``pillar/baseline.sls``.
 """
 
 import datetime as _dt
@@ -134,6 +134,14 @@ def scan(severities=None, top_n=None):
     except (OSError, _subprocess.SubprocessError) as exc:
         return {"minion": __grains__.get("id", ""),  # noqa: F821
                 "error": "scan failed to run: {}".format(exc)}
+    if proc.returncode != 0:
+        # A leftover report.json from a previous success must not be
+        # summarized with a fresh scanned_at — Overstate would show
+        # stale CVE counts as a current scan.
+        return {"minion": __grains__.get("id", ""),  # noqa: F821
+                "error": "trivy exited {}".format(proc.returncode),
+                "retcode": proc.returncode,
+                "stderr_tail": (proc.stderr or "")[-500:]}
     try:
         with open(report_path, encoding="utf-8") as handle:
             report = _json.load(handle)

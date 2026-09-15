@@ -56,7 +56,6 @@ PACKAGES+=(
     cronie
     firewalld
     systemd-resolved
-    chrony
 )
 
 zypper --non-interactive install --no-recommends "${PACKAGES[@]}"
@@ -95,12 +94,15 @@ rm -f /srv/pillar/pillar
 # /srv/pillar) would nest it as /srv/pillar/pillar instead.
 if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
     ln -sfn "$REPO_ROOT/salt/baseline" /srv/salt/baseline
+    # Custom execution modules (trivy_scan) live next to states, not inside
+    # baseline/. A traditional minion file_roots of /srv/salt needs this.
+    ln -sfn "$REPO_ROOT/salt/_modules" /srv/salt/_modules
 
     # Symlink pillar files so the repository's pillar/top.sls is used
     ln -sfn "$REPO_ROOT/pillar/top.sls" /srv/pillar/top.sls
     ln -sfn "$REPO_ROOT/pillar/baseline.sls" /srv/pillar/baseline.sls
 
-    echo "    Symlinked baseline/ into /srv/salt"
+    echo "    Symlinked baseline/ and _modules/ into /srv/salt"
     echo "    Symlinked pillar files into /srv/pillar"
 else
     echo "    WARNING: Could not find salt/baseline in repo root."
@@ -137,7 +139,7 @@ echo "     sudo make salt-call SALT_ARGS='state.apply baseline test=True'"
 echo
 echo "  3. Run Goss tests:"
 echo "     make goss"
-echo "     make goss-chrony"
+echo "     make goss-timesyncd"
 echo "     ..."
 echo
 echo "  4. (Optional) Install a local goss binary:"

@@ -1,11 +1,20 @@
 # Goss tests for baseline.trivy
 #
-# The daily trivy_scan.publish job persists to the minion drop-in checked
-# in goss/schedule.yaml (one file block per path — a second block here
-# would shadow it). This file covers the scan artifact itself: the full
-# JSON report produced by the initial scan on first apply.
+# Schedule job names are asserted here (not in goss/schedule.yaml) so
+# `make goss-schedule` after only baseline.schedule still passes, and
+# disabling Trivy on an unsupported flavor does not fail schedule Goss.
+# Use command greps rather than a second file: block on _schedule.conf —
+# gossfile merges would shadow the schedule.yaml block for the same path.
 
 file:
   /var/cache/trivy/report.json:
     exists: true
     title: "trivy vulnerability report exists"
+
+command:
+  "grep -q trivy-cve-scan /etc/salt/minion.d/_schedule.conf":
+    exit-status: 0
+    title: "trivy-cve-scan schedule is present"
+  "grep -q trivy_scan.publish /etc/salt/minion.d/_schedule.conf":
+    exit-status: 0
+    title: "trivy_scan.publish is scheduled"

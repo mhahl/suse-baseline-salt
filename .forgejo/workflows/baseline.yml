@@ -5,16 +5,18 @@ on:
     branches: [main]
     paths:
       - "goss/banner.yaml"
-      - "goss/chrony.yaml"
       - "goss/profile.yaml"
       - "goss/schedule.yaml"
       - "goss/systemd-resolved.yaml"
+      - "goss/timesyncd.yaml"
       - "goss/trivy.yaml"
       - "goss/updates.yaml"
       - "goss/usb.yaml"
       - "goss/baseline.yaml"
       - "goss/goss.yaml"
       - "salt/baseline/**"
+      - "salt/_modules/**"
+      - "tests/**"
       - "pillar/baseline.sls"
       - "pillar/top.sls"
       - "Makefile"
@@ -23,16 +25,18 @@ on:
     branches: [main]
     paths:
       - "goss/banner.yaml"
-      - "goss/chrony.yaml"
       - "goss/profile.yaml"
       - "goss/schedule.yaml"
       - "goss/systemd-resolved.yaml"
+      - "goss/timesyncd.yaml"
       - "goss/trivy.yaml"
       - "goss/updates.yaml"
       - "goss/usb.yaml"
       - "goss/baseline.yaml"
       - "goss/goss.yaml"
       - "salt/baseline/**"
+      - "salt/_modules/**"
+      - "tests/**"
       - "pillar/baseline.sls"
       - "pillar/top.sls"
       - "Makefile"
@@ -69,7 +73,13 @@ jobs:
           zypper --non-interactive refresh
           zypper --non-interactive install --no-recommends \
             salt-minion make curl git ca-certificates \
-            chrony systemd-resolved systemd
+            chrony systemd-resolved systemd \
+            python3-pytest python3-Jinja2
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          python3 -m pytest tests/ -q
 
       - name: Install Goss
         run: |
@@ -100,7 +110,8 @@ jobs:
             --file-root="$SRC/salt" \
             --pillar-root="$SRC/pillar" \
             --log-level=warning \
-            state.sls baseline || echo "baseline apply completed. Continuing."
+            --retcode-passthrough \
+            state.sls baseline
 
       - name: Run Goss (baseline)
         run: |

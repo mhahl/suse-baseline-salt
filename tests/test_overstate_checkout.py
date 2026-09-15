@@ -2,8 +2,7 @@
 
 Overstate's Sync now button (and scripts/sync-file-roots.sh) runs
 ``git fetch`` + ``git pull --ff-only`` on FILE_ROOTS, which refuses
-anything that is not a checkout with an upstream: plain copies made by
-``make overstate-deploy`` report "not a git checkout". These tests run
+anything that is not a checkout with an upstream. These tests run
 the Makefile target against a local source repo (no network) and assert
 the deployed dir satisfies the whole sync contract:
 
@@ -114,8 +113,8 @@ def test_recheckout_pulls_new_commits(source_repo, tmp_path):
 def test_nonempty_non_checkout_refuses(source_repo, tmp_path):
     srv = tmp_path / "srv"
     (srv / "salt").mkdir(parents=True)
-    (srv / "salt" / "legacy.sls").write_text("untracked local file\n")
+    (srv / "salt" / "local.sls").write_text("untracked local file\n")
     proc = _checkout(source_repo, srv)
     assert proc.returncode != 0
     assert "not a git checkout" in (proc.stdout + proc.stderr).lower()
-    assert (srv / "salt" / "legacy.sls").is_file(), "refusal must change nothing"
+    assert (srv / "salt" / "local.sls").is_file(), "refusal must change nothing"

@@ -91,6 +91,10 @@ def test_restorecon_only_when_selinux_enforced():
     )
     assert "restorecon -Rv /run/systemd/resolve" in enforcing
     assert "onlyif: command -v restorecon" in enforcing
+    assert "onchanges:" in enforcing
+    assert "- service: resolved_service" in enforcing
+    restorecon = enforcing.split("resolved_selinux_restorecon:", 1)[1]
+    assert "watch:" not in restorecon
 
     permissive = render_init(
         {

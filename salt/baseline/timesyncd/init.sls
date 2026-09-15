@@ -1,10 +1,7 @@
-{# baseline.timesyncd/init.sls — clock sync via systemd-timesyncd.
-   Replaces baseline.chrony: one fewer daemon, no extra package, and no
-   fight between two NTP clients. Server list comes from the same
-   baseline:ntp pillar the chrony state used (servers, optional
-   fallback); chrony-only keys (iburst, driftfile, ...) are inert now.
-   Apply with: salt '*' state.apply baseline.timesyncd
-   (also included in the full baseline). #}
+{# Clock sync via systemd-timesyncd. Stop/remove chrony so two NTP
+   clients cannot step the clock. Server list comes from baseline:ntp
+   (servers, optional fallback).
+   Apply with: salt '*' state.apply baseline.timesyncd #}
 timesyncd_config:
   file.managed:
     - name: /etc/systemd/timesyncd.conf.d/99-baseline.conf

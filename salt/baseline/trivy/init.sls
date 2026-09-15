@@ -7,6 +7,7 @@
 trivy_sync_modules:
   module.run:
     - name: saltutil.sync_modules
+    - reload_modules: True
     - order: 1
 
 {# Unsupported platforms skip trivy instead of failing the whole

@@ -18,4 +18,10 @@ trivy_initial_scan:
     - onlyif: test -x /usr/bin/trivy -o -x /usr/local/bin/trivy
     - require:
       - file: trivy_cache_dir
+      - module: trivy_sync_modules
+{% if trivy.install_flavor == 'binary' %}
+      - cmd: trivy_binary
+{% elif trivy.install_flavor in ('zypper', 'rpm_repo') %}
+      - pkg: trivy_package
+{% endif %}
 {% endif %}

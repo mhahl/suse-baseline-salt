@@ -4,11 +4,12 @@
 # /etc/salt/minion.d/_schedule.conf, which is what these checks read.
 # Overstate surfaces the same jobs in its Schedules tab via schedule.list.
 # The nightly highstate uses a cron expression, which needs the croniter
-# module (python313-croniter) on the minion.
+# module (virtual python3-croniter) on the minion. Trivy job names live
+# in goss/trivy.yaml so this file stays valid after baseline.schedule alone.
 
-package:
-  python313-croniter:
-    installed: true
+command:
+  "rpm -q --whatprovides python3-croniter":
+    exit-status: 0
     title: "croniter module for cron schedules is installed"
 
 file:
@@ -23,8 +24,6 @@ file:
       - "highstate-nightly"
       - "state.highstate"
       - "17 2 \\* \\* \\*"
-      - "trivy-cve-scan"
-      - "trivy_scan.publish"
       - "sync-modules-daily"
       - "saltutil.sync_modules"
-    title: "mine, highstate and trivy schedules are present"
+    title: "mine, highstate and sync-modules schedules are present"

@@ -108,6 +108,23 @@ def test_auto_dup_only_on_tumbleweed():
     pillar = {"baseline:updates:auto_dup": True}
     tw = render("baseline/updates/init.sls", TW, pillar)
     assert "tumbleweed_full_update" in tw
+    assert "dup --dry-run" in tw
+    assert "list-patches" not in tw
     leap = render("baseline/updates/init.sls", LEAP, pillar)
     assert "tumbleweed_full_update" not in leap
     assert "updates_zypper_config" in leap  # zypp config still applies
+    assert "file.keyvalue:" in leap
+    assert "file.managed:" not in leap
+
+
+def test_trivy_init_reloads_modules_after_sync():
+    rendered = render("baseline/trivy/init.sls", TW)
+    assert "reload_modules: True" in rendered
+
+
+def test_initial_scan_requires_sync_and_install():
+    rendered = render("baseline/trivy/scan.sls", TW)
+    assert "- module: trivy_sync_modules" in rendered
+    assert "- pkg: trivy_package" in rendered
+    binary = render("baseline/trivy/scan.sls", SLES)
+    assert "- cmd: trivy_binary" in binary
