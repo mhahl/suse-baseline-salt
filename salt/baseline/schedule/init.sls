@@ -7,6 +7,7 @@
 {% set enabled = sched.get('enabled', True) %}
 {% set mine_cfg = sched.get('mine_update', {}) %}
 {% set highstate_cfg = sched.get('highstate', {}) %}
+{% set sync_cfg = sched.get('sync_modules', {}) %}
 
 {# The nightly highstate uses a cron expression, which the minion only
    evaluates with the croniter module installed (source package
@@ -42,4 +43,21 @@ baseline_highstate_nightly:
 baseline_highstate_nightly:
   schedule.absent:
     - name: highstate-nightly
+{% endif %}
+
+{# Custom execution modules (trivy_scan and friends) only reach minions
+   via saltutil.sync_modules. The nightly highstate syncs as a side
+   effect, but a dedicated daily job closes the window where the master
+   already serves new module code while minions still run the old copy. #}
+{% if enabled and sync_cfg.get('enabled', True) %}
+baseline_sync_modules:
+  schedule.present:
+    - name: sync-modules-daily
+    - function: saltutil.sync_modules
+    - days: 1
+    - splay: {{ sync_cfg.get('splay', 600) }}
+{% else %}
+baseline_sync_modules:
+  schedule.absent:
+    - name: sync-modules-daily
 {% endif %}

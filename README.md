@@ -104,7 +104,7 @@ salt/
     │                       # systemd-resolved, timesyncd, trivy, updates, usb
     ├── banner/
     ├── profile/
-    ├── schedule/           # hourly mine.update + nightly highstate
+    ├── schedule/           # hourly mine.update + nightly highstate + daily module sync
     ├── systemd-resolved/
     ├── timesyncd/          # NTP via systemd-timesyncd (replaces chrony)
     ├── trivy/              # daily Trivy CVE scans + mine publishing

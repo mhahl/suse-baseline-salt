@@ -25,4 +25,6 @@ file:
       - "17 2 \\* \\* \\*"
       - "trivy-cve-scan"
       - "trivy_scan.publish"
+      - "sync-modules-daily"
+      - "saltutil.sync_modules"
     title: "mine, highstate and trivy schedules are present"

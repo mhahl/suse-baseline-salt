@@ -35,6 +35,12 @@ baseline:
       # does not stampede the master at once.
       cron: "17 2 * * *"
       splay: 900
+    sync_modules:
+      enabled: true
+      # Daily saltutil.sync_modules so custom execution modules reach
+      # minions without waiting for the next highstate. Splayed like
+      # the other daily jobs.
+      splay: 600
 
   # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
   # small summary published to the Salt Mine under trivy.scan_summary
