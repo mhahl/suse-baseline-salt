@@ -1,0 +1,25 @@
+# Example master config for the reactor/ examples in this repo.
+# Copy to /etc/salt/master.d/reactor.conf (adapt <srv> to your layout),
+# then: systemctl reload salt-master
+# (Overstate prod: reload/restart the salt-master container).
+#
+# file_roots gains the reactor dir: overstate-checkout deploys this repo
+# whole at <srv>, so the examples live at <srv>/reactor/ — outside the
+# salt file root. The extra entry serves them as salt://service.sls and
+# friends. NOTE: that puts reactor files at the salt:// top level, so keep
+# their names unique against salt/ top-level SLS files.
+file_roots:
+  base:
+    - /var/lib/overstate/srv/salt
+    - /var/lib/overstate/srv/reactor
+
+# Confirm exact beacon tags on your master before enforcing:
+#   salt-run state.event pretty=True
+# then trip each beacon (stop timesyncd, touch a watched file, fill disk).
+reactor:
+  - 'salt/beacon/*/service/*':
+    - salt://service.sls
+  - 'salt/beacon/*/inotify/*':
+    - salt://inotify.sls
+  - 'salt/beacon/*/diskspace/*':
+    - salt://diskspace.sls

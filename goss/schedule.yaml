@@ -4,13 +4,18 @@
 # /etc/salt/minion.d/_schedule.conf, which is what these checks read.
 # Overstate surfaces the same jobs in its Schedules tab via schedule.list.
 # The nightly highstate uses a cron expression, which needs the croniter
-# module (virtual python3-croniter) on the minion. Trivy job names live
-# in goss/trivy.yaml so this file stays valid after baseline.schedule alone.
+# module importable by the minion (system python3-croniter RPM and/or
+# croniter in Salt's own Python for onedir/venv minions). Trivy job names
+# live in goss/trivy.yaml so this file stays valid after baseline.schedule
+# alone.
 
 command:
   "rpm -q --whatprovides python3-croniter":
     exit-status: 0
-    title: "croniter module for cron schedules is installed"
+    title: "croniter system package for cron schedules is installed"
+  "python3 -c 'import croniter'":
+    exit-status: 0
+    title: "croniter module is importable (cron schedules evaluate)"
 
 file:
   /etc/salt/minion.d/_schedule.conf:

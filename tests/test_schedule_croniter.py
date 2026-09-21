@@ -3,9 +3,11 @@
 The nightly highstate uses a ``cron:`` expression, which the minion can
 only evaluate with the ``croniter`` Python module installed. These tests
 render the real ``salt/baseline/schedule/init.sls`` with a stubbed
-pillar and assert the virtual ``python3-croniter`` package is installed and
-required by the cron job — in both the enabled and disabled branches
-(removing a stale job must not depend on the package being present).
+pillar and assert both providers are installed — the virtual
+``python3-croniter`` system package (classic RPM minions) and ``croniter``
+in Salt's own Python (onedir/venv/container minions) — and required by
+the cron job in the enabled branch. In the disabled branches the packages
+stay installed but removing a stale job must not depend on them.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -32,12 +34,17 @@ def render_init(pillar_schedule):
 def test_cron_job_requires_croniter_package():
     rendered = render_init({})
     assert "- name: python3-croniter" in rendered
+    assert "pip.installed:" in rendered
+    assert "- name: croniter" in rendered
     assert "schedule.present:" in rendered
     assert "- pkg: schedule_croniter_package" in rendered
+    assert "- pip: schedule_croniter_pip" in rendered
 
 
 def test_disabled_branches_need_no_package_require():
     rendered = render_init({"enabled": False})
     assert "- name: python3-croniter" in rendered
+    assert "pip.installed:" in rendered
     assert "schedule.absent:" in rendered
     assert "- pkg: schedule_croniter_package" not in rendered
+    assert "- pip: schedule_croniter_pip" not in rendered

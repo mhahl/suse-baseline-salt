@@ -11,10 +11,22 @@
 
 {# python3-croniter is the virtual name: python313-croniter Provides it
    on Tumbleweed/Leap 16; Leap 15.x ships python3-croniter itself. A
-   hard-coded python313-croniter fails pkg.installed on Leap 15. #}
+   hard-coded python313-croniter fails pkg.installed on Leap 15.
+   The system package only covers minions running on the system Python.
+   Onedir/venv/container minions ship an isolated interpreter that never
+   sees system site-packages (upstream: "Missing python-croniter" despite
+   the RPM being installed), so install croniter into Salt's own Python
+   as well via pip. Salt reads HAS_CRONITER once at minion start: after
+   the first apply that installs either provider, restart salt-minion
+   once, or the scheduler keeps logging "Missing python-croniter.
+   Ignoring job highstate-nightly" until then. #}
 schedule_croniter_package:
   pkg.installed:
-    - name: python3-croniter
+    - name: python313-croniter
+
+schedule_croniter_pip:
+  pip.installed:
+    - name: croniter
 
 {% if enabled and mine_cfg.get('enabled', True) %}
 baseline_mine_update:
@@ -39,6 +51,7 @@ baseline_highstate_nightly:
     - splay: {{ highstate_cfg.get('splay', 900) }}
     - require:
       - pkg: schedule_croniter_package
+      - pip: schedule_croniter_pip
 {% else %}
 baseline_highstate_nightly:
   schedule.absent:

@@ -121,7 +121,14 @@ pillar/
 ├── baseline.sls            # baseline.* settings + top-level mine_functions
 └── top.sls
 
+reactor/                     # master-side examples (needs reactor.conf wiring below)
+├── service.sls             # service beacon → restart resolved/timesyncd
+├── inotify.sls             # inotify beacon → re-apply owning module / audit line
+├── diskspace.sls           # diskspace beacon → vacuum journal + zypper clean
+└── reactor.conf.example    # master wiring (file_roots + tag map)
+
 tests/
+├── test_reactor.py               # reactor example render tests
 ├── test_overstate_checkout.py    # overstate-checkout Makefile contract
 ├── test_schedule_croniter.py     # croniter package + highstate cron require
 ├── test_schedule_sync_modules.py # daily saltutil.sync_modules job
@@ -277,6 +284,32 @@ base:
 - Tune or disable either in pillar under `baseline:schedule`; disabling a
   job removes it from the minion (`schedule.absent`) instead of leaving a
   stale schedule behind.
+
+### 6. Reactor (optional, master-side)
+
+`reactor/` holds master-side answers to minion beacon events — the other
+half of the schedule/mine loop: schedules publish posture, beacons raise
+events, reactor acts on them.
+
+| Event | Example | Action |
+|---|---|---|
+| service beacon: resolved/timesyncd down | `reactor/service.sls` | `service.start` on that minion |
+| inotify beacon: baseline file changed | `reactor/inotify.sls` | re-apply the owning `baseline.*` module |
+| inotify beacon: auth/ssh file changed | `reactor/inotify.sls` | syslog audit line (wire a notify runner for paging) |
+| diskspace beacon: usage ≥ 85% | `reactor/diskspace.sls` | vacuum journal + `zypper clean` (both regenerable) |
+
+Wiring (master host, one time):
+
+1. `make overstate-checkout` already ships `reactor/` to `<srv>/reactor/`.
+2. Copy `reactor/reactor.conf.example` to `/etc/salt/master.d/reactor.conf`
+   (adapt `<srv>` paths) and reload the master.
+3. Confirm live beacon tags/fields with `salt-run state.event pretty=True`,
+   then trip each beacon (stop timesyncd, touch a watched file).
+
+Guards are fail-closed: unlisted services and below-threshold usage
+render nothing, and unlisted paths only get the harmless audit line —
+never a re-apply. Minion beacons themselves are not in this baseline
+yet — each example header shows the beacon block that feeds it.
 
 ---
 
