@@ -79,7 +79,7 @@ jobs:
           zypper --non-interactive refresh
           zypper --non-interactive install --no-recommends \
             salt-minion make curl git ca-certificates \
-            chrony systemd-resolved systemd \
+            systemd-resolved systemd \
             python3-pytest python3-Jinja2
 
       - name: Run unit tests

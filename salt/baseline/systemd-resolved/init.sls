@@ -1,7 +1,6 @@
-{% from "baseline/systemd-resolved/map.jinja" import resolved with context %}
 systemd_resolved_package:
   pkg.installed:
-    - name: {{ resolved.pkg }}
+    - name: systemd-resolved
 
 resolved_runtime_dir:
   file.directory:
@@ -26,8 +25,7 @@ resolved_config:
     - require:
       - pkg: systemd_resolved_package
 
-{% if grains.get('os_family', '') == 'Suse' %}
-# openSUSE/SLE netconfig rewrites /etc/resolv.conf on network events,
+# Tumbleweed netconfig rewrites /etc/resolv.conf on network events,
 # ripping out the stub symlink below. An empty DNS policy tells it to
 # leave resolv.conf alone; safe here because systemd-resolved (enforced
 # below) owns DNS on these hosts.
@@ -40,7 +38,6 @@ netconfig_dns_policy:
     - onlyif: test -f /etc/sysconfig/network/config
     - require_in:
       - file: resolv_conf_symlink
-{% endif %}
 
 resolv_conf_symlink:
   file.symlink:

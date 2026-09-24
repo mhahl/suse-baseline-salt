@@ -69,9 +69,7 @@ baseline:
   # small summary published to the Salt Mine under trivy.scan_summary
   # (counts, fixable total, top 20 CVEs). All keys are optional.
   trivy:
-    version: '0.74.0'     # exact version for the tarball URL (SLES/binary flavor)
-    arch: '64bit'         # tarball arch suffix: '64bit' or 'ARM64'
-    pkg_version: ''       # exact package pin for repo installs (empty = repo latest)
+    pkg_version: ''       # exact package pin (empty = repo latest)
     severities: 'HIGH,CRITICAL'
     top_n: 20             # CVEs kept in the mine summary 'top' list
     skip_db_update: False # True = offline scans only, manage DB separately

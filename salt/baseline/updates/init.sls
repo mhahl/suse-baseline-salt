@@ -11,11 +11,10 @@ updates_zypper_config:
         solver.allowVendorChange: 'false'
         download.use_deltarpm: 'true'
 
-{# zypper dup is a rolling-release operation: running it on Leap/SLES
-   production hosts risks vendor-change breakage, so auto_dup applies to
-   Tumbleweed only no matter what pillar requests. Tumbleweed has no
-   patch metadata, so list-patches never fires — gate on dup --dry-run. #}
-{% set auto_dup = salt['pillar.get']('baseline:updates:auto_dup', False) and grains.get('os', '') == 'openSUSE Tumbleweed' %}
+{# zypper dup is Tumbleweed's update mechanism (rolling release; no
+   patch metadata, so list-patches never fires — gate on dup --dry-run).
+   Off by default; opt in per host via pillar. #}
+{% set auto_dup = salt['pillar.get']('baseline:updates:auto_dup', False) %}
 {% if auto_dup %}
 tumbleweed_full_update:
   cmd.run:

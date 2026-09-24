@@ -14,15 +14,16 @@ echo "==> Preparing SUSE VM for suse-baseline-salt testing"
 echo "    Repository root: $REPO_ROOT"
 echo
 
-# check SUSE
+# check Tumbleweed
 if [[ ! -f /etc/os-release ]]; then
-    echo "ERROR: This script is intended for openSUSE / SLES systems."
+    echo "ERROR: This script is intended for openSUSE Tumbleweed systems."
     exit 1
 fi
 
 source /etc/os-release
-if [[ "${ID_LIKE:-}" != *"suse"* && "${ID}" != "opensuse-tumbleweed" && "${ID}" != "opensuse-leap" ]]; then
-    echo "WARNING: This does not look like a SUSE system (detected: ${PRETTY_NAME:-unknown})"
+if [[ "${ID:-}" != "opensuse-tumbleweed" ]]; then
+    echo "WARNING: This does not look like openSUSE Tumbleweed (detected: ${PRETTY_NAME:-unknown})"
+    echo "This baseline supports Tumbleweed only."
     read -r -p "Continue anyway? [y/N] " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
 fi

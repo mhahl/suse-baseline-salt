@@ -12,8 +12,3 @@ file:
     contents:
       - "NTP=time1.google.com"
     title: "timesyncd drop-in sets the baseline NTP servers"
-
-package:
-  chrony:
-    installed: false
-    title: "chrony package is removed"

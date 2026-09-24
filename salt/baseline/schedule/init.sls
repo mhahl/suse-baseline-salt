@@ -9,10 +9,9 @@
 {% set highstate_cfg = sched.get('highstate', {}) %}
 {% set sync_cfg = sched.get('sync_modules', {}) %}
 
-{# python3-croniter is the virtual name: python313-croniter Provides it
-   on Tumbleweed/Leap 16; Leap 15.x ships python3-croniter itself. A
-   hard-coded python313-croniter fails pkg.installed on Leap 15.
-   The system package only covers minions running on the system Python.
+{# python3-croniter is the virtual name (python313-croniter Provides
+   it on Tumbleweed). The system package only covers minions running on
+   the system Python.
    Onedir/venv/container minions ship an isolated interpreter that never
    sees system site-packages (upstream: "Missing python-croniter" despite
    the RPM being installed), so install croniter into Salt's own Python

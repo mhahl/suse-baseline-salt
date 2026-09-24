@@ -1,26 +1,7 @@
-{# baseline/trivy/map.jinja — per-OS install flavor plus pillar-overridable defaults.
-   NOTE: match on os_family, not the `os` grain — openSUSE reports
-   "openSUSE Leap" / "openSUSE Tumbleweed", never bare "openSUSE", so an
-   exact `os == 'openSUSE'` match silently classifies the whole SUSE
-   fleet as unsupported. #}
-{% set _os = grains.get('os', '') %}
-{% set _family = grains.get('os_family', '') %}
-{% if _family == 'RedHat' %}
-{% set _flavor = 'rpm_repo' %}
-{% elif _family == 'Suse' and _os in ('SLES', 'SLES_SAP', 'SUSE') %}
-{% set _flavor = 'binary' %}
-{% elif _family == 'Suse' %}
-{% set _flavor = 'zypper' %}
-{% else %}
-{% set _flavor = 'unsupported' %}
-{% endif %}
-{# Release tarball arch suffix per CPU arch; unknown arches keep the
-   x86_64 default and fail loudly on download instead of guessing. #}
-{% set _arches = {'x86_64': '64bit', 'aarch64': 'ARM64'} %}
+{# baseline/trivy/map.jinja — pillar-overridable defaults.
+   Tumbleweed-only: Trivy comes from the community package, so there is
+   no per-OS flavor selection anymore. #}
 {% set trivy = {
-  'install_flavor': _flavor,
-  'version': '0.74.0',
-  'arch': _arches.get(grains.get('cpuarch', 'x86_64'), '64bit'),
   'pkg_version': '',
   'severities': 'HIGH,CRITICAL',
   'top_n': 20,

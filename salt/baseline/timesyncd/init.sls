@@ -1,6 +1,6 @@
-{# Clock sync via systemd-timesyncd. Stop/remove chrony so two NTP
-   clients cannot step the clock. Server list comes from baseline:ntp
-   (servers, optional fallback).
+{# Clock sync via systemd-timesyncd, the only NTP client on these
+   hosts. Server list comes from baseline:ntp (servers, optional
+   fallback).
    Apply with: salt '*' state.apply baseline.timesyncd #}
 timesyncd_config:
   file.managed:
@@ -14,13 +14,6 @@ timesyncd_config:
     - context:
         ntp: {{ salt['pillar.get']('baseline:ntp', {}) }}
 
-# Stop chronyd first so the two daemons never step the clock together,
-# then remove the superseded package and its config.
-chronyd_service:
-  service.dead:
-    - name: chronyd
-    - enable: False
-
 timesyncd_service:
   service.running:
     - name: systemd-timesyncd
@@ -29,16 +22,3 @@ timesyncd_service:
       - file: timesyncd_config
     - require:
       - file: timesyncd_config
-      - service: chronyd_service
-
-chrony_package:
-  pkg.removed:
-    - name: chrony
-    - require:
-      - service: timesyncd_service
-
-chrony_config:
-  file.absent:
-    - name: /etc/chrony.conf
-    - require:
-      - pkg: chrony_package

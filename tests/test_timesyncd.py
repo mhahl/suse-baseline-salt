@@ -1,8 +1,6 @@
 """Render tests for baseline.timesyncd (systemd-timesyncd NTP).
 
-Timesyncd replaces the old chrony formula: one fewer daemon, no extra
-package, and the superseded chrony package/config are removed so the
-two clients never fight for the clock. Server list reuses the
+Timesyncd is the only NTP client on these hosts. Server list reuses the
 baseline:ntp pillar (servers, optional fallback).
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
@@ -47,11 +45,11 @@ def test_dropin_defaults_to_pool():
     assert "NTP=pool.ntp.org" in out
 
 
-def test_init_manages_service_and_removes_chrony():
+def test_init_manages_config_and_service_only():
     grains = {"os_family": "Suse"}
     out = render("baseline/timesyncd/init.sls", grains)
     assert "name: systemd-timesyncd" in out
     assert "99-baseline.conf" in out
-    assert "service.dead" in out  # chronyd stopped first
-    assert "pkg.removed" in out  # superseded chrony package gone
-    assert "name: /etc/chrony.conf" in out
+    assert "service.running" in out
+    assert "chrony" not in out
+    assert "chronyd" not in out

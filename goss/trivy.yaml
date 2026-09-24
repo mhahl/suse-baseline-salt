@@ -1,8 +1,7 @@
 # Goss tests for baseline.trivy
 #
 # Schedule job names are asserted here (not in goss/schedule.yaml) so
-# `make goss-schedule` after only baseline.schedule still passes, and
-# disabling Trivy on an unsupported flavor does not fail schedule Goss.
+# `make goss-schedule` after only baseline.schedule still passes.
 # Use command greps rather than a second file: block on _schedule.conf —
 # gossfile merges would shadow the schedule.yaml block for the same path.
 
