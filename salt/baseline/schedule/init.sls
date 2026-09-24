@@ -22,7 +22,7 @@
    Ignoring job highstate-nightly" until then. #}
 schedule_croniter_package:
   pkg.installed:
-    - name: python313-croniter
+    - name: python3-croniter
 
 schedule_croniter_pip:
   pip.installed:
