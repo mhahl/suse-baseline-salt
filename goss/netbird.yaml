@@ -1,0 +1,15 @@
+# Goss tests for baseline.netbird (official repo client + daemon)
+
+command:
+  "zypper lr netbird":
+    exit-status: 0
+    title: "official NetBird repo is configured"
+  "rpm -q netbird":
+    exit-status: 0
+    title: "NetBird client package is installed"
+
+service:
+  netbird:
+    enabled: true
+    running: true
+    title: "netbird daemon is enabled and running"

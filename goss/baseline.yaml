@@ -1,6 +1,7 @@
 gossfile:
   banner.yaml: {}
   freeipa.yaml: {}
+  netbird.yaml: {}
   profile.yaml: {}
   schedule.yaml: {}
   systemd-resolved.yaml: {}

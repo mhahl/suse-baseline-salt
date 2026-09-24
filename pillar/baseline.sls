@@ -53,6 +53,18 @@ baseline:
     packages:
       - freeipa-client
 
+  # NetBird mesh-VPN client (baseline.netbird): install + daemon from
+  # the official NetBird RPM repo. Joining (`netbird up`) stays manual —
+  # it needs an SSO login or a setup key. Disabling removes the repo and
+  # stops the daemon but keeps already-installed packages.
+  netbird:
+    enabled: true
+    repo_name: 'netbird'
+    repo_url: 'https://pkgs.netbird.io/yum/'
+    packages:
+      - netbird
+    enable_service: true
+
   # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
   # small summary published to the Salt Mine under trivy.scan_summary
   # (counts, fixable total, top 20 CVEs). All keys are optional.
