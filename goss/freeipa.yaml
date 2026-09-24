@@ -1,0 +1,9 @@
+# Goss tests for baseline.freeipa (OBS security:idm client, install only)
+
+command:
+  "zypper lr security:idm":
+    exit-status: 0
+    title: "OBS security:idm repo is configured"
+  "rpm -q freeipa-client":
+    exit-status: 0
+    title: "FreeIPA client package is installed"

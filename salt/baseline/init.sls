@@ -1,5 +1,6 @@
 include:
   - baseline.banner
+  - baseline.freeipa
   - baseline.profile
   - baseline.schedule
   - baseline.systemd-resolved

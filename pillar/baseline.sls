@@ -42,6 +42,17 @@ baseline:
       # the other daily jobs.
       splay: 600
 
+  # FreeIPA client (baseline.freeipa): install-only from the OBS
+  # security:idm repo for Tumbleweed. Enrollment (ipa-client-install)
+  # stays manual — it needs interactive admin credentials. Disabling
+  # removes the repo but keeps already-installed packages.
+  freeipa:
+    enabled: true
+    repo_name: 'security:idm'
+    repo_url: 'https://download.opensuse.org/repositories/security:/idm/openSUSE_Tumbleweed/'
+    packages:
+      - freeipa-client
+
   # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
   # small summary published to the Salt Mine under trivy.scan_summary
   # (counts, fixable total, top 20 CVEs). All keys are optional.
