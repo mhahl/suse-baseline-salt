@@ -27,7 +27,8 @@ def render_init(pillar_schedule):
     tpl = env.get_template("baseline/schedule/init.sls")
     pillar = {"baseline:schedule": pillar_schedule}
     salt = {"pillar.get": lambda key, default=None: pillar.get(key, default)}
-    return tpl.render(salt=salt)
+    grains = {"pythonversion": [3, 13, 0, "final", 0]}
+    return tpl.render(grains=grains, salt=salt)
 
 
 def test_sync_modules_scheduled_by_default():

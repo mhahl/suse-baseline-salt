@@ -9,9 +9,12 @@
 {% set highstate_cfg = sched.get('highstate', {}) %}
 {% set sync_cfg = sched.get('sync_modules', {}) %}
 
-{# python3-croniter is the virtual name (python313-croniter Provides
-   it on Tumbleweed). The system package only covers minions running on
-   the system Python.
+{# croniter/pip matched to the minion's own interpreter: TW ships
+   versioned stacks side by side (python313-*, python314-*) and the
+   unversioned python3-* virtuals do not resolve on minion snapshots,
+   so derive the suffix from Salt's pythonversion grain — always the
+   interpreter that must import croniter for cron schedules.
+   The system packages only cover minions running on the system Python.
    Onedir/venv/container minions ship an isolated interpreter that never
    sees system site-packages (upstream: "Missing python-croniter" despite
    the RPM being installed), so install croniter into Salt's own Python
@@ -19,15 +22,16 @@
    the first apply that installs either provider, restart salt-minion
    once, or the scheduler keeps logging "Missing python-croniter.
    Ignoring job highstate-nightly" until then. #}
+{% set _py = 'python3' ~ grains.get('pythonversion', [3, 13])[1] %}
 schedule_croniter_package:
   pkg.installed:
-    - name: python3-croniter
+    - name: {{ _py }}-croniter
 
 # pip itself is not guaranteed present (minimal images): the pip provider
 # below needs a binary, so install it first. Harmless where already present.
 schedule_pip_package:
   pkg.installed:
-    - name: python3-pip
+    - name: {{ _py }}-pip
 
 schedule_croniter_pip:
   pip.installed:
