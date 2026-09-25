@@ -138,6 +138,7 @@ After applying the states:
 # System
 resolvectl status
 timedatectl show-timesync --all
+systemctl is-enabled chronyd 2>/dev/null || echo "chronyd not present (good)"
 
 # Hardening
 lsmod | grep -E 'usb_storage|uas' || true

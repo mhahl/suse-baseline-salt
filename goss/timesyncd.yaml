@@ -4,6 +4,10 @@ service:
   systemd-timesyncd:
     enabled: true
     title: "systemd-timesyncd service is enabled"
+  chronyd:
+    enabled: false
+    running: false
+    title: "chronyd is disabled and stopped"
 
 file:
   /etc/systemd/timesyncd.conf.d/99-baseline.conf:
@@ -12,3 +16,8 @@ file:
     contents:
       - "NTP=time1.google.com"
     title: "timesyncd drop-in sets the baseline NTP servers"
+
+package:
+  chrony:
+    installed: false
+    title: "chrony package is removed"
