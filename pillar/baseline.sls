@@ -65,6 +65,16 @@ baseline:
       - netbird
     enable_service: true
 
+  # Minion master addresses (baseline.minion): IPs, not DNS, with
+  # native Salt failover across the prod masters. Default is Salt's
+  # built-in 'salt' hostname (zero behavior change).
+  minion:
+    enabled: true
+    masters:
+      - 139.99.210.89   # salt-42e5.overstate.syd.prod
+      - 139.99.210.170  # salt-b2b6.overstate.syd.prod
+      - 139.99.149.92   # salt-c010.overstate.syd.prod
+
   # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
   # small summary published to the Salt Mine under trivy.scan_summary
   # (counts, fixable total, top 20 CVEs). All keys are optional.

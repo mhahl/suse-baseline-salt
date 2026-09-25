@@ -13,7 +13,7 @@
 
 | Category | Modules |
 |----------|---------|
-| **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `trivy`, `freeipa`, `netbird` |
+| **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `trivy`, `freeipa`, `netbird`, `minion` |
 | **Hardening** | `usb` |
 
 - **Forensic-ready** bash history and session controls
@@ -54,6 +54,7 @@ See [`pillar/baseline.sls`](pillar/baseline.sls) for every knob (`baseline.*` se
 - `baseline:updates:auto_dup: false` — `zypper dup` never runs unless opted in
 - `baseline:freeipa:enabled: true` — OBS `security:idm` repo + `freeipa-client`, no enrollment
 - `baseline:netbird:enabled: true` — official NetBird repo + daemon, no network join
+- `baseline:minion:masters` — minion's master IPs with native failover (default `['salt']`; minion restarts on change)
 
 ---
 
@@ -100,10 +101,11 @@ salt/
 │   └── trivy_scan.py       # scan/publish for the trivy module
 └── baseline/               # flat: one dir per module, all in init.sls
     ├── init.sls            # Tumbleweed guard + includes (banner, freeipa,
-    │                       # netbird, profile, schedule, systemd-resolved,
-    │                       # timesyncd, trivy, updates, usb)
+    │                       # minion, netbird, profile, schedule,
+    │                       # systemd-resolved, timesyncd, trivy, updates, usb)
     ├── banner/
     ├── freeipa/            # OBS security:idm repo + freeipa-client (no enroll)
+    ├── minion/             # minion master address: IP, not DNS
     ├── netbird/            # official NetBird repo + daemon (no join)
     ├── profile/
     ├── schedule/           # mine-update-hourly, highstate-nightly, sync-modules-daily
@@ -144,6 +146,9 @@ cat /etc/modprobe.d/99-baseline-usb-storage.conf
 # Identity / VPN clients
 zypper lr security:idm && rpm -q freeipa-client
 zypper lr netbird && rpm -q netbird && systemctl is-active netbird
+
+# Minion master address
+cat /etc/salt/minion.d/99-baseline.conf
 
 # Scheduling (Overstate fleets)
 cat /etc/salt/minion.d/_schedule.conf

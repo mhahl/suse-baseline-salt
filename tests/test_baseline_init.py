@@ -37,8 +37,9 @@ TW_SUSE_FULLNAME = {"os": "SUSE", "os_family": "Suse",
                     "osfullname": "openSUSE Tumbleweed",
                     "osmajorrelease": 20260922, "osrelease": "20260922"}
 
-MODULES = ("banner", "freeipa", "netbird", "profile", "schedule",
-           "systemd-resolved", "timesyncd", "trivy", "updates", "usb")
+MODULES = ("banner", "freeipa", "minion", "netbird", "profile",
+           "schedule", "systemd-resolved", "timesyncd", "trivy", "updates",
+           "usb")
 
 
 def render_init(grains):

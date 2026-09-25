@@ -16,6 +16,7 @@
 include:
   - baseline.banner
   - baseline.freeipa
+  - baseline.minion
   - baseline.netbird
   - baseline.profile
   - baseline.schedule

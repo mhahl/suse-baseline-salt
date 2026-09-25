@@ -1,0 +1,10 @@
+# Goss tests for baseline.minion (master address, IP not DNS)
+
+file:
+  /etc/salt/minion.d/99-baseline.conf:
+    exists: true
+    mode: "0644"
+    contents:
+      - "master:"
+      - "master_type: failover"
+    title: "minion master address drop-in is present"

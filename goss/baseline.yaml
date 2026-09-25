@@ -1,6 +1,7 @@
 gossfile:
   banner.yaml: {}
   freeipa.yaml: {}
+  minion.yaml: {}
   netbird.yaml: {}
   profile.yaml: {}
   schedule.yaml: {}
