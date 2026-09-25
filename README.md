@@ -214,7 +214,7 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ## ⚠️ Important Notes
 
-- **Tumbleweed only.** Anything else fails fast at `baseline/init.sls`. Detection accepts the canonical `openSUSE Tumbleweed` grain or a SUSE host with a rolling-date release (some minions report `os=SUSE`); Leap/SLES numeric majors stay rejected.
+- **Tumbleweed only.** Anything else fails fast at `baseline/init.sls`. Detection keys off `osfullname` first (observed minions report `os=SUSE` while `osfullname` correctly says Tumbleweed), with a rolling-date-release fallback; Leap/SLES stay rejected.
 - **USB storage** is blocked by default (set `baseline:usb:block_storage: false` to allow it — that removes a previously deployed blacklist file).
 - **Automatic `zypper dup` is disabled by default** — set `baseline:updates:auto_dup: true` to enable it.
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).

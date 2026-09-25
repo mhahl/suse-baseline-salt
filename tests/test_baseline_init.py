@@ -26,6 +26,16 @@ LEAP15 = {"os": "openSUSE Leap", "os_family": "Suse", "osmajorrelease": 15,
           "osrelease": "15.6"}
 LEAP16 = {"os": "openSUSE Leap", "os_family": "Suse", "osmajorrelease": 16,
           "osrelease": "16.0"}
+# SLES as Salt reports it: os-release ID=sles maps to bare os="SUSE"
+# (salt/grains/core.py _OS_NAME_MAP), with osfullname "SLES".
+# Rejected like everything non-TW.
+SLES = {"os": "SUSE", "os_family": "Suse", "osfullname": "SLES",
+        "osmajorrelease": 15, "osrelease": "15.5"}
+# The reported fleet case: os="SUSE" but osfullname correctly says
+# Tumbleweed. Admitted via osfullname.
+TW_SUSE_FULLNAME = {"os": "SUSE", "os_family": "Suse",
+                    "osfullname": "openSUSE Tumbleweed",
+                    "osmajorrelease": 20260922, "osrelease": "20260922"}
 
 MODULES = ("banner", "freeipa", "netbird", "profile", "schedule",
            "systemd-resolved", "timesyncd", "trivy", "updates", "usb")
@@ -55,8 +65,15 @@ def test_suse_with_rolling_date_is_admitted():
         assert f"- baseline.{module}" in rendered
 
 
+def test_suse_grain_with_tumbleweed_fullname_is_admitted():
+    rendered = render_init(dict(TW_SUSE_FULLNAME))
+    assert "test.fail_without_changes" not in rendered
+    for module in MODULES:
+        assert f"- baseline.{module}" in rendered
+
+
 def test_other_os_fails_fast_with_grains_in_message():
-    for grains in (LEAP15, LEAP16,
+    for grains in (LEAP15, LEAP16, SLES,
                    {"os": "Debian", "os_family": "Debian",
                     "osrelease": "12"},
                    {}):
