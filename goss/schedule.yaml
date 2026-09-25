@@ -17,6 +17,11 @@ command:
     exit-status: 0
     title: "croniter module is importable (cron schedules evaluate)"
 
+package:
+  python3-pip:
+    installed: true
+    title: "pip is present for the croniter pip provider"
+
 file:
   /etc/salt/minion.d/_schedule.conf:
     exists: true

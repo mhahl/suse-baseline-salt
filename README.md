@@ -142,8 +142,8 @@ lsmod | grep -E 'usb_storage|uas' || true
 cat /etc/modprobe.d/99-baseline-usb-storage.conf
 
 # Identity / VPN clients
-zypper lr security:idm && rpm -q gpg-pubkey-6dd785ca && rpm -q freeipa-client
-zypper lr netbird && rpm -q gpg-pubkey-d267a61f && rpm -q netbird && systemctl is-active netbird
+zypper lr security:idm && rpm -q freeipa-client
+zypper lr netbird && rpm -q netbird && systemctl is-active netbird
 
 # Scheduling (Overstate fleets)
 cat /etc/salt/minion.d/_schedule.conf

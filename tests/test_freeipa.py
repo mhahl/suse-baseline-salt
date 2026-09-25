@@ -33,21 +33,14 @@ def test_enabled_adds_repo_and_installs_client():
     assert "pkgrepo.managed:" in rendered
     assert "- name: security:idm" in rendered
     assert "security:/idm/openSUSE_Tumbleweed" in rendered
-    assert "rpm --import" in rendered
-    assert "repodata/repomd.xml.key" in rendered
-    assert "- unless: rpm -q gpg-pubkey-6dd785ca" in rendered
-    assert "- cmd: freeipa_repo_key" in rendered
     assert "pkg.installed:" in rendered
     assert "- freeipa-client" in rendered
     assert "- fromrepo: security:idm" in rendered
     assert "- pkgrepo: freeipa_obs_repo" in rendered
+    # zypper prompts on new/rotated keys: both states auto-import natively
+    assert rendered.count("- gpgautoimport: True") == 2
+    assert "rpm --import" not in rendered
     assert "pkgrepo.absent:" not in rendered
-
-
-def test_custom_keyid_overrides_default():
-    rendered = render_freeipa({"repo_keyid": "deadbeef"})
-    assert "- unless: rpm -q gpg-pubkey-deadbeef" in rendered
-    assert "gpg-pubkey-6dd785ca" not in rendered
 
 
 def test_disabled_removes_repo_only():

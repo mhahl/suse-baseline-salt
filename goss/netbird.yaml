@@ -4,9 +4,6 @@ command:
   "zypper lr netbird":
     exit-status: 0
     title: "official NetBird repo is configured"
-  "rpm -q gpg-pubkey-d267a61f":
-    exit-status: 0
-    title: "NetBird repo signing key is trusted"
   "rpm -q netbird":
     exit-status: 0
     title: "NetBird client package is installed"

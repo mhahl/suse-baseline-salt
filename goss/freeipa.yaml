@@ -4,9 +4,6 @@ command:
   "zypper lr security:idm":
     exit-status: 0
     title: "OBS security:idm repo is configured"
-  "rpm -q gpg-pubkey-6dd785ca":
-    exit-status: 0
-    title: "security:idm repo signing key is trusted"
   "rpm -q freeipa-client":
     exit-status: 0
     title: "FreeIPA client package is installed"

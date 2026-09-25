@@ -1,6 +1,17 @@
 {# Edit the vendor zypp.conf in place. A wholesale file.managed wipe
    drops distro/admin keys (excludedocs, solver, credentials paths)
-   that libzypp compiled defaults do not restore. #}
+   that libzypp compiled defaults do not restore. file.keyvalue cannot
+   open a missing file, so ensure an (empty = compiled defaults) one
+   exists first without ever touching an existing file's contents. #}
+updates_zypp_conf_exists:
+  file.managed:
+    - name: /etc/zypp/zypp.conf
+    - contents: ""
+    - replace: False
+    - user: root
+    - group: root
+    - mode: '0644'
+
 updates_zypper_config:
   file.keyvalue:
     - name: /etc/zypp/zypp.conf
@@ -10,6 +21,8 @@ updates_zypper_config:
         solver.onlyRequires: 'true'
         solver.allowVendorChange: 'false'
         download.use_deltarpm: 'true'
+    - require:
+      - file: updates_zypp_conf_exists
 
 {# zypper dup is Tumbleweed's update mechanism (rolling release; no
    patch metadata, so list-patches never fires — gate on dup --dry-run).

@@ -34,16 +34,19 @@ def render_init(pillar_schedule):
 def test_cron_job_requires_croniter_package():
     rendered = render_init({})
     assert "- name: python3-croniter" in rendered
+    assert "- name: python3-pip" in rendered
     assert "pip.installed:" in rendered
     assert "- name: croniter" in rendered
     assert "schedule.present:" in rendered
     assert "- pkg: schedule_croniter_package" in rendered
+    assert "- pkg: schedule_pip_package" in rendered
     assert "- pip: schedule_croniter_pip" in rendered
 
 
 def test_disabled_branches_need_no_package_require():
     rendered = render_init({"enabled": False})
     assert "- name: python3-croniter" in rendered
+    assert "- name: python3-pip" in rendered
     assert "pip.installed:" in rendered
     assert "schedule.absent:" in rendered
     assert "- pkg: schedule_croniter_package" not in rendered

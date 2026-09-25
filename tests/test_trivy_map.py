@@ -95,3 +95,12 @@ def test_auto_dup_is_pillar_driven():
     off = render("baseline/updates/init.sls")
     assert "tumbleweed_full_update" not in off
     assert "updates_zypper_config" in off  # zypp config still applies
+
+
+def test_zypp_conf_created_before_keyvalue():
+    # file.keyvalue cannot open a missing file (minimal images),
+    # so the state ensures an empty one first without touching existing.
+    rendered = render("baseline/updates/init.sls")
+    assert "updates_zypp_conf_exists" in rendered
+    assert "- replace: False" in rendered
+    assert "- file: updates_zypp_conf_exists" in rendered

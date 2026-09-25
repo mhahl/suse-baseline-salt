@@ -50,7 +50,6 @@ baseline:
     enabled: true
     repo_name: 'security:idm'
     repo_url: 'https://download.opensuse.org/repositories/security:/idm/openSUSE_Tumbleweed/'
-    repo_keyid: '6dd785ca'  # rpm gpg-pubkey id of the repo signing key (update on rotation)
     packages:
       - freeipa-client
 
@@ -62,7 +61,6 @@ baseline:
     enabled: true
     repo_name: 'netbird'
     repo_url: 'https://pkgs.netbird.io/yum/'
-    repo_keyid: 'd267a61f'  # rpm gpg-pubkey id of the repo signing key (update on rotation)
     packages:
       - netbird
     enable_service: true

@@ -23,9 +23,17 @@ schedule_croniter_package:
   pkg.installed:
     - name: python3-croniter
 
+# pip itself is not guaranteed present (minimal images): the pip provider
+# below needs a binary, so install it first. Harmless where already present.
+schedule_pip_package:
+  pkg.installed:
+    - name: python3-pip
+
 schedule_croniter_pip:
   pip.installed:
     - name: croniter
+    - require:
+      - pkg: schedule_pip_package
 
 {% if enabled and mine_cfg.get('enabled', True) %}
 baseline_mine_update:
