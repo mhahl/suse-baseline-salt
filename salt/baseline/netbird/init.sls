@@ -6,15 +6,26 @@
    .../yum/repodata/repomd.xml.key, fingerprint AA9C 09AA 9DEA 2F58
    112B 40DF DFFE AB2F D267 A61F, dev@netbird.io). Disabling removes
    the repo and stops the daemon but keeps already-installed packages,
-   like the croniter providers in baseline.schedule. #}
+   like the croniter providers in baseline.schedule.
+   zypper prompts to trust a new/rotated signing key interactively and
+   fails non-interactive refreshes until it is trusted, so the key is
+   pre-imported below (idempotent via the gpg-pubkey check; repo_keyid
+   must track the repo's current signing key). #}
 {% set cfg = salt['pillar.get']('baseline:netbird', {}) %}
 {% set enabled = cfg.get('enabled', True) %}
 {% set repo_name = cfg.get('repo_name', 'netbird') %}
 {% set repo_url = cfg.get('repo_url', 'https://pkgs.netbird.io/yum/') %}
+{% set repo_keyid = cfg.get('repo_keyid', 'd267a61f') %}
+{% set repo_key_url = repo_url.rstrip('/') + '/repodata/repomd.xml.key' %}
 {% set packages = cfg.get('packages', ['netbird']) %}
 {% set enable_service = cfg.get('enable_service', True) %}
 
 {% if enabled %}
+netbird_repo_key:
+  cmd.run:
+    - name: rpm --import {{ repo_key_url }}
+    - unless: rpm -q gpg-pubkey-{{ repo_keyid }}
+
 netbird_repo:
   pkgrepo.managed:
     - name: {{ repo_name }}
@@ -23,6 +34,8 @@ netbird_repo:
     - enabled: True
     - refresh: True
     - gpgcheck: 1
+    - require:
+      - cmd: netbird_repo_key
 
 netbird_client:
   pkg.installed:
