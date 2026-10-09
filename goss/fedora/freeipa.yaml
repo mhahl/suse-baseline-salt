@@ -1,0 +1,6 @@
+# Fedora provides freeipa-client in its base repositories.
+
+package:
+  freeipa-client:
+    installed: true
+    title: "FreeIPA client package is installed"

@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SALT_ROOT = REPO_ROOT / "salt"
 
 
-def render_netbird(pillar_netbird):
+def render_netbird(pillar_netbird, grains=None):
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(SALT_ROOT)),
         keep_trailing_newline=True,
@@ -26,7 +26,7 @@ def render_netbird(pillar_netbird):
     tpl = env.get_template("baseline/netbird/init.sls")
     pillar = {"baseline:netbird": pillar_netbird}
     salt = {"pillar.get": lambda key, default=None: pillar.get(key, default)}
-    return tpl.render(salt=salt)
+    return tpl.render(grains=grains or {"os_family": "Suse"}, salt=salt)
 
 
 def test_enabled_adds_repo_installs_client_and_runs_service():
@@ -70,3 +70,17 @@ def test_custom_repo_and_packages():
     )
     assert "https://example.invalid/netbird/" in rendered
     assert "- netbird-ui" in rendered
+
+
+def test_fedora_uses_repo_signing_and_skips_zypper_auto_import():
+    rendered = render_netbird({}, grains={"os": "Fedora", "os_family": "RedHat"})
+    assert "pkgrepo.managed:" in rendered
+    assert "https://pkgs.netbird.io/yum/" in rendered
+    assert "gpgkey: https://pkgs.netbird.io/yum/repodata/repomd.xml.key" in rendered
+    assert "gpgcheck: 1" in rendered
+    assert "repo_gpgcheck: 1" in rendered
+    assert "gpgautoimport:" not in rendered
+    assert "pkg.installed:" in rendered
+    assert "- netbird" in rendered
+    assert "- fromrepo: netbird" in rendered
+    assert "service.running:" in rendered

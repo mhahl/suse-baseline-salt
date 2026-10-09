@@ -1,0 +1,15 @@
+# Fedora uses RPM repository key verification rather than zypper auto-import.
+
+command:
+  "dnf repolist --enabled | grep -q '^netbird[[:space:]]'":
+    exit-status: 0
+    title: "official NetBird repo is configured"
+  "rpm -q netbird":
+    exit-status: 0
+    title: "NetBird client package is installed"
+
+service:
+  netbird:
+    enabled: true
+    running: true
+    title: "netbird daemon is enabled and running"

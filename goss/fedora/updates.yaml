@@ -1,0 +1,11 @@
+# The Fedora branch preserves the DNF defaults and disables upgrades by default.
+
+file:
+  /etc/dnf/dnf.conf:
+    exists: true
+    title: "DNF configuration is present"
+
+command:
+  "dnf --version":
+    exit-status: 0
+    title: "DNF is available"

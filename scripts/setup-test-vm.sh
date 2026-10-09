@@ -10,23 +10,24 @@ if [[ ! -d "$REPO_ROOT/salt/baseline" || ! -d "$REPO_ROOT/goss" ]]; then
     exit 1
 fi
 
-echo "==> Preparing SUSE VM for suse-baseline-salt testing"
+echo "==> Preparing openSUSE Tumbleweed or Fedora VM for testing"
 echo "    Repository root: $REPO_ROOT"
 echo
 
-# check Tumbleweed
+# supported operating systems
 if [[ ! -f /etc/os-release ]]; then
-    echo "ERROR: This script is intended for openSUSE Tumbleweed systems."
+    echo "ERROR: /etc/os-release is required to identify the target OS."
     exit 1
 fi
 
 source /etc/os-release
-if [[ "${ID:-}" != "opensuse-tumbleweed" ]]; then
-    echo "WARNING: This does not look like openSUSE Tumbleweed (detected: ${PRETTY_NAME:-unknown})"
-    echo "This baseline supports Tumbleweed only."
-    read -r -p "Continue anyway? [y/N] " confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || exit 1
-fi
+case "${ID:-}" in
+    opensuse-tumbleweed|fedora) ;;
+    *)
+        echo "ERROR: This baseline supports openSUSE Tumbleweed and Fedora (detected: ${PRETTY_NAME:-unknown})."
+        exit 1
+        ;;
+esac
 
 echo "Detected: ${PRETTY_NAME:-$ID}"
 
@@ -36,30 +37,19 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# refresh repos
+# refresh repositories and install packages
 echo "==> Refreshing package repositories..."
-zypper --non-interactive refresh
-
-# install packages
-echo "==> Installing required packages..."
-
-PACKAGES=(
-    salt-minion          # provides salt-call
-    make
-    curl
-    git
-    ca-certificates
-)
-
-# baseline packages
-PACKAGES+=(
-    audit
-    cronie
-    firewalld
-    systemd-resolved
-)
-
-zypper --non-interactive install --no-recommends "${PACKAGES[@]}"
+if [[ "$ID" == "opensuse-tumbleweed" ]]; then
+    zypper --non-interactive refresh
+    echo "==> Installing required packages..."
+    PACKAGES=(salt-minion make curl git ca-certificates audit cronie firewalld systemd-resolved)
+    zypper --non-interactive install --no-recommends "${PACKAGES[@]}"
+else
+    dnf makecache
+    echo "==> Installing required packages..."
+    PACKAGES=(salt-minion make curl git ca-certificates audit cronie firewalld systemd-resolved)
+    dnf install -y "${PACKAGES[@]}"
+fi
 
 # install goss
 GOSS_VERSION="${GOSS_VERSION:-v0.4.9}"
@@ -124,7 +114,7 @@ fi
 # final instructions
 echo
 echo "==================================================================="
-echo "  SUSE VM setup complete!"
+echo "  Linux VM setup complete!"
 echo "==================================================================="
 echo
 echo "Next steps (using the Makefile - recommended):"
@@ -139,9 +129,13 @@ echo "     # Or use the full salt-call target for more control:"
 echo "     sudo make salt-call SALT_ARGS='state.apply baseline test=True'"
 echo
 echo "  3. Run Goss tests:"
-echo "     make goss"
-echo "     make goss-timesyncd"
-echo "     ..."
+if [[ "$ID" == "fedora" ]]; then
+    echo "     goss --gossfile goss/fedora.yaml validate"
+else
+    echo "     make goss"
+    echo "     make goss-timesyncd"
+    echo "     ..."
+fi
 echo
 echo "  4. (Optional) Install a local goss binary:"
 echo "     make install-goss"

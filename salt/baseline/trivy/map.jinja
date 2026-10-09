@@ -1,6 +1,6 @@
 {# baseline/trivy/map.jinja — pillar-overridable defaults.
-   Tumbleweed-only: Trivy comes from the community package, so there is
-   no per-OS flavor selection anymore. #}
+   Tumbleweed uses the community package; Fedora provides trivy in its
+   base repositories. Both packages install /usr/bin/trivy. #}
 {% set trivy = {
   'pkg_version': '',
   'severities': 'HIGH,CRITICAL',

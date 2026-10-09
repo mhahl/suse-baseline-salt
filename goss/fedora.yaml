@@ -1,0 +1,12 @@
+gossfile:
+  banner.yaml: {}
+  minion.yaml: {}
+  profile.yaml: {}
+  schedule.yaml: {}
+  systemd-resolved.yaml: {}
+  timesyncd.yaml: {}
+  trivy.yaml: {}
+  usb.yaml: {}
+  fedora/freeipa.yaml: {}
+  fedora/netbird.yaml: {}
+  fedora/updates.yaml: {}

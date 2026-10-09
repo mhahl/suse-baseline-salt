@@ -7,12 +7,9 @@
    112B 40DF DFFE AB2F D267 A61F, dev@netbird.io). Disabling removes
    the repo and stops the daemon but keeps already-installed packages,
    like the croniter providers in baseline.schedule.
-   zypper prompts to trust a new/rotated signing key interactively and
-   fails non-interactive refreshes until it is trusted, so both states
-   below pass gpgautoimport (zypper's own --gpg-auto-import-keys):
-   same trust level as a manual rpm --import, verified against Salt's
-   zypper module (mod_repo/refresh_db honor it, and pkg.installed
-   forwards it to the resolve_capabilities refresh). #}
+   On Tumbleweed, zypper needs gpgautoimport for non-interactive repo
+   refreshes. Fedora uses the repo's gpgkey and repo_gpgcheck instead. #}
+{% set _family = grains.get('os_family', '') %}
 {% set cfg = salt['pillar.get']('baseline:netbird', {}) %}
 {% set enabled = cfg.get('enabled', True) %}
 {% set repo_name = cfg.get('repo_name', 'netbird') %}
@@ -21,6 +18,7 @@
 {% set enable_service = cfg.get('enable_service', True) %}
 
 {% if enabled %}
+{% if _family == 'Suse' %}
 netbird_repo:
   pkgrepo.managed:
     - name: {{ repo_name }}
@@ -30,6 +28,18 @@ netbird_repo:
     - refresh: True
     - gpgcheck: 1
     - gpgautoimport: True
+{% elif _family == 'RedHat' %}
+netbird_repo:
+  pkgrepo.managed:
+    - name: {{ repo_name }}
+    - humanname: NetBird
+    - baseurl: {{ repo_url }}
+    - enabled: True
+    - refresh: True
+    - gpgkey: {{ repo_url }}repodata/repomd.xml.key
+    - gpgcheck: 1
+    - repo_gpgcheck: 1
+{% endif %}
 
 netbird_client:
   pkg.installed:
@@ -38,7 +48,9 @@ netbird_client:
       - {{ pkg }}
 {% endfor %}
     - fromrepo: {{ repo_name }}
+{% if _family == 'Suse' %}
     - gpgautoimport: True
+{% endif %}
     - require:
       - pkgrepo: netbird_repo
 

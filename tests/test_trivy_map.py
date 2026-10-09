@@ -1,9 +1,8 @@
-"""Render tests for baseline.trivy (Tumbleweed-only).
+"""Render tests for baseline.trivy and update branches on both platforms.
 
-Trivy comes from the community package: install is a plain
-``pkg.installed``, the initial scan requires it, and ``auto_dup`` in
-baseline.updates is purely pillar-driven now that there is no other OS
-left to protect.
+Trivy comes from the Tumbleweed community package or Fedora's base repos.
+The install is ``pkg.installed``, the initial scan requires it, and ``auto_dup`` in
+baseline.updates selects the platform's update command.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -17,6 +16,8 @@ SALT_ROOT = REPO_ROOT / "salt"
 
 TW = {"os": "openSUSE Tumbleweed", "os_family": "Suse",
       "osmajorrelease": 20250905, "cpuarch": "x86_64"}
+FEDORA = {"os": "Fedora", "os_family": "RedHat",
+          "osrelease": "43", "cpuarch": "x86_64"}
 
 
 def render(path, grains=None, pillar=None):
@@ -104,3 +105,22 @@ def test_zypp_conf_created_before_keyvalue():
     assert "updates_zypp_conf_exists" in rendered
     assert "- replace: False" in rendered
     assert "- file: updates_zypp_conf_exists" in rendered
+
+
+def test_fedora_updates_use_minimal_dnf_conf_and_gate_upgrade():
+    off = render("baseline/updates/init.sls", grains=dict(FEDORA))
+    assert "/etc/dnf/dnf.conf" in off
+    assert "updates_dnf_conf_exists" in off
+    assert "updates_zypper_config" not in off
+    assert "zypper" not in off
+    assert "dnf upgrade --refresh -y" not in off
+
+    on = render(
+        "baseline/updates/init.sls",
+        grains=dict(FEDORA),
+        pillar={"baseline:updates:auto_dup": True},
+    )
+    assert "dnf upgrade --refresh -y" in on
+    assert "dnf -q check-update --refresh" in on
+    assert "tumbleweed_full_update" not in on
+    assert "zypper" not in on

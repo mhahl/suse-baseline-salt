@@ -9,11 +9,8 @@
 {% set highstate_cfg = sched.get('highstate', {}) %}
 {% set sync_cfg = sched.get('sync_modules', {}) %}
 
-{# croniter/pip matched to the minion's own interpreter: TW ships
-   versioned stacks side by side (python313-*, python314-*) and the
-   unversioned python3-* virtuals do not resolve on minion snapshots,
-   so derive the suffix from Salt's pythonversion grain — always the
-   interpreter that must import croniter for cron schedules.
+{# System package names differ by family: Tumbleweed uses versioned
+   python3${minor}-* stacks; Fedora uses python3-* package names.
    The system packages only cover minions running on the system Python.
    Onedir/venv/container minions ship an isolated interpreter that never
    sees system site-packages (upstream: "Missing python-croniter" despite
@@ -22,7 +19,8 @@
    the first apply that installs either provider, restart salt-minion
    once, or the scheduler keeps logging "Missing python-croniter.
    Ignoring job highstate-nightly" until then. #}
-{% set _py = 'python3' ~ grains.get('pythonversion', [3, 13])[1] %}
+{% set _family = grains.get('os_family', '') %}
+{% set _py = 'python3' ~ grains.get('pythonversion', [3, 13])[1] if _family == 'Suse' else 'python3' %}
 schedule_croniter_package:
   pkg.installed:
     - name: {{ _py }}-croniter

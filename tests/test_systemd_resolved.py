@@ -1,9 +1,8 @@
-"""Render tests for baseline/systemd-resolved (Tumbleweed-only).
+"""Render tests for the shared baseline/systemd-resolved state.
 
-Tumbleweed splits the resolver into the ``systemd-resolved`` subpackage,
-so the package is fixed — no map selection. The netconfig guard always
-renders (Tumbleweed always ships netconfig), while the restorecon block
-still keys off the live SELinux state.
+The resolver package name is shared by both supported platforms. The
+netconfig guard is conditional on the Tumbleweed config path existing,
+while the restorecon block still keys off the live SELinux state.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """

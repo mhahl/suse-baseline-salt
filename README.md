@@ -1,9 +1,10 @@
 # SUSE Baseline
 
-> SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed**. Nothing else is supported — `baseline/init.sls` fails fast on any other OS instead of half-applying Tumbleweed package names and paths.
+> SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed and Fedora**. `baseline/init.sls` fails fast on unsupported OS grains.
 
 [![Salt](https://img.shields.io/badge/Salt-3006%2B-blue)](https://saltproject.io/)
 [![openSUSE](https://img.shields.io/badge/openSUSE-Tumbleweed-green)](https://www.opensuse.org/)
+[![Fedora](https://img.shields.io/badge/Fedora-supported-blue?logo=fedora)](https://getfedora.org/)
 [![Goss](https://img.shields.io/badge/Tests-Goss-orange)](https://goss.rocks/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -13,6 +14,7 @@
 
 | Category | Modules |
 |----------|---------|
+| **Supported OS** | openSUSE Tumbleweed, Fedora |
 | **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `trivy`, `freeipa`, `netbird`, `minion` |
 | **Hardening** | `usb` |
 
@@ -20,7 +22,7 @@
 - **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP via systemd-timesyncd — the only NTP client here)
 - **Modern security controls** (USB storage blocking)
 - **Vulnerability scanning** — daily Trivy OS-package scans with summaries published to the Salt Mine (`trivy.scan_summary`)
-- **Identity & mesh VPN clients** — FreeIPA from the OBS `security:idm` repo and NetBird from its official repo (both install-only; enrollment/join stays manual)
+- **Identity and mesh VPN clients** — FreeIPA from OBS on Tumbleweed or Fedora base repositories, and NetBird from its official repo (clients only; enrollment/join stays manual)
 - **Overstate-ready scheduling** — hourly mine updates, nightly highstate, and daily jobs, visible in Overstate's Schedules tab
 - **Pillar-driven** — DNS, NTP, USB, schedule, trivy, freeipa, netbird, and update behavior are configurable via pillar
 
@@ -29,7 +31,7 @@
 ## 🚀 Quick Start
 
 ```bash
-# Apply the full baseline (Tumbleweed only)
+# Apply the full baseline (openSUSE Tumbleweed or Fedora)
 salt '*' state.apply baseline
 ```
 
@@ -51,26 +53,31 @@ base:
 See [`pillar/baseline.sls`](pillar/baseline.sls) for every knob (`baseline.*` settings plus top-level `mine_functions` for the Salt Mine). Notable defaults:
 
 - `baseline:usb:block_storage: true` — USB storage blocked
-- `baseline:updates:auto_dup: false` — `zypper dup` never runs unless opted in
-- `baseline:freeipa:enabled: true` — OBS `security:idm` repo + `freeipa-client`, no enrollment
-- `baseline:netbird:enabled: true` — official NetBird repo + daemon, no network join
+- `baseline:updates:auto_dup: false` — no upgrade runs unless opted in (`zypper dup` on Tumbleweed, `dnf upgrade --refresh` on Fedora)
+- `baseline:freeipa:enabled: true` — OBS `security:idm` repo on Tumbleweed; Fedora base repo; no enrollment
+- `baseline:netbird:enabled: true` — official NetBird repo + daemon, no network join; repo signing is configured per package manager
 - `baseline:minion:masters` — minion's master IPs with native failover (default `['salt']`; minion restarts on change)
 
 ---
 
 ## 🛠️ Development & Testing
 
-### On a Tumbleweed VM (recommended)
+### On an openSUSE Tumbleweed or Fedora VM
 
 ```bash
-# One-time setup
+# One-time setup (installs OS-specific package dependencies)
 sudo ./scripts/setup-test-vm.sh
 
-# Run checks
+# Shared checks
 make lint
 make test
+
+# Tumbleweed Goss suite
 make goss
 make goss-timesyncd
+
+# Fedora Goss suite
+goss --gossfile goss/fedora.yaml validate --format tap
 ```
 
 ### Make targets
@@ -79,7 +86,8 @@ make goss-timesyncd
 |---------|-------------|
 | `make lint` | Run yamllint |
 | `make test` | Run pytest unit/render tests |
-| `make goss` | Run all Goss tests |
+| `make goss` | Run the openSUSE Tumbleweed Goss suite |
+| `goss --gossfile goss/fedora.yaml validate --format tap` | Run Fedora Goss tests |
 | `make goss-<component>` | Tests for one module, e.g. `goss-timesyncd` |
 | `make install-goss` | Download Goss binary |
 | `make apply` | `state.apply baseline` locally |
@@ -89,7 +97,7 @@ make goss-timesyncd
 
 ### CI
 
-Goss tests run in containers on `opensuse-tumbleweed` runners ([`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml), triggered on push/PR to states, modules, tests, pillar, Goss files, and the Makefile). The job lints YAML, runs `pytest`, applies the states (`--retcode-passthrough`, so a failed apply fails the job), then runs Goss.
+CI runs separate `opensuse-tumbleweed` and `fedora-latest` container jobs ([`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)). Both lint YAML, run `pytest`, apply the baseline with `--retcode-passthrough`, and run the matching Goss suite. Fedora uses DNF and Fedora-specific checks.
 
 ---
 
@@ -99,12 +107,12 @@ Goss tests run in containers on `opensuse-tumbleweed` runners ([`.forgejo/workfl
 salt/
 ├── _modules/               # custom execution modules (synced automatically)
 │   └── trivy_scan.py       # scan/publish for the trivy module
-└── baseline/               # flat: one dir per module, all in init.sls
-    ├── init.sls            # Tumbleweed guard + includes (banner, freeipa,
-    │                       # minion, netbird, profile, schedule,
-    │                       # systemd-resolved, timesyncd, trivy, updates, usb)
+└── baseline/               # Salt modules plus shared and family includes
+    ├── init.sls            # grain guard + shared module includes
+    ├── redhat/             # Fedora group includes freeipa, netbird, schedule, updates
+    ├── suse/               # Tumbleweed group includes freeipa, netbird, schedule, updates
     ├── banner/
-    ├── freeipa/            # OBS security:idm repo + freeipa-client (no enroll)
+    ├── freeipa/            # OBS repo on Tumbleweed; Fedora base package (no enroll)
     ├── minion/             # minion master address: IP, not DNS
     ├── netbird/            # official NetBird repo + daemon (no join)
     ├── profile/
@@ -112,7 +120,7 @@ salt/
     ├── systemd-resolved/   # DoT resolvers + stub symlink + netconfig guard
     ├── timesyncd/          # NTP via systemd-timesyncd
     ├── trivy/              # install + scan + daily schedule + clean
-    ├── updates/            # zypp config + optional zypper dup
+    ├── updates/            # zypp on Tumbleweed; minimal DNF config + optional upgrade on Fedora
     └── usb/                # USB mass-storage blacklist
 
 pillar/
@@ -122,7 +130,7 @@ pillar/
 reactor/                     # master-side examples (needs reactor.conf wiring below)
 ├── service.sls             # service beacon → restart resolved/timesyncd
 ├── inotify.sls             # inotify beacon → re-apply owning module / audit line
-├── diskspace.sls           # diskspace beacon → vacuum journal + zypper clean
+├── diskspace.sls           # diskspace beacon → vacuum journal + Tumbleweed zypper clean
 └── reactor.conf.example    # master wiring (file_roots + tag map)
 
 tests/                       # pytest render/unit tests, one file per module
@@ -144,9 +152,17 @@ systemctl is-enabled chronyd 2>/dev/null || echo "chronyd not present (good)"
 lsmod | grep -E 'usb_storage|uas' || true
 cat /etc/modprobe.d/99-baseline-usb-storage.conf
 
-# Identity / VPN clients
+# Identity / VPN clients — openSUSE Tumbleweed
 zypper lr security:idm && rpm -q freeipa-client
 zypper lr netbird && rpm -q netbird && systemctl is-active netbird
+
+# Identity / VPN clients — Fedora
+rpm -q freeipa-client
+dnf repolist netbird && rpm -q netbird && systemctl is-active netbird
+
+# Update configuration
+test -f /etc/zypp/zypp.conf  # openSUSE Tumbleweed
+test -f /etc/dnf/dnf.conf   # Fedora
 
 # Minion master address
 cat /etc/salt/minion.d/99-baseline.conf
@@ -220,9 +236,10 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ## ⚠️ Important Notes
 
-- **Tumbleweed only.** Anything else fails fast at `baseline/init.sls`. Detection keys off `osfullname` first (observed minions report `os=SUSE` while `osfullname` correctly says Tumbleweed), with a rolling-date-release fallback; Leap/SLES stay rejected.
+- **Supported platforms:** openSUSE Tumbleweed and Fedora. The guard keeps the existing Tumbleweed grain variants and admits Fedora only for `os_family=RedHat` and `os=Fedora`; other platforms fail fast.
 - **USB storage** is blocked by default (set `baseline:usb:block_storage: false` to allow it — that removes a previously deployed blacklist file).
-- **Automatic `zypper dup` is disabled by default** — set `baseline:updates:auto_dup: true` to enable it.
+- **Automatic upgrades are disabled by default** — set `baseline:updates:auto_dup: true` to enable `zypper dup` on Tumbleweed or `dnf upgrade --refresh` on Fedora.
+- **Package-manager behavior branches by family:** FreeIPA uses OBS on Tumbleweed and Fedora's base repositories; NetBird signing configuration differs between zypper and DNF.
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
 - **No network joins.** FreeIPA enrollment (`ipa-client-install`) and NetBird join (`netbird up`) stay manual — both need credentials this baseline will not carry.
 
@@ -230,7 +247,7 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ## 📋 Requirements
 
-- Salt minion on openSUSE Tumbleweed
+- Salt minion on openSUSE Tumbleweed or Fedora
 - Root access for package installation
 
 ---
@@ -245,7 +262,7 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ### Conventions
 
-- **Tumbleweed only** — no per-OS branches, no grain conditionals for platform selection. New external repos must be Salt-managed with `gpgcheck` and documented key provenance.
+- **Branch on `os_family` only for platform differences.** Keep common modules shared; use the Suse and RedHat include groups for divergent states. Validate Tumbleweed grains with the existing fullname/`os`/rolling-release paths, and Fedora with `os_family=RedHat` plus `os=Fedora`. New external repos must be Salt-managed with `gpgcheck` and documented key provenance.
 - **State IDs are `snake_case`** (`trivy_cache_dir`). Never reuse a scheduled job's name as a state ID — pass it via `- name:` instead.
 - **All baseline pillar nests under `baseline:`**. The only top-level exception is `mine_functions`, which Salt reads exclusively from the pillar root.
 - **Pillar merges live in `map.jinja`** (trivy); SLS files stay declarative.

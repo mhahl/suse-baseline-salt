@@ -1,11 +1,7 @@
-"""Render tests for the Tumbleweed-only baseline guard.
+"""Render tests for the openSUSE Tumbleweed and Fedora baseline guard.
 
-``baseline/init.sls`` includes the modules on Tumbleweed and fails fast
-anywhere else instead of half-applying Tumbleweed package names and
-paths. Detection is multi-signal: some Salt versions/images report
-Tumbleweed hosts as ``os=SUSE`` instead of ``openSUSE Tumbleweed``, so
-family Suse plus a date-shaped osrelease (VERSION_ID=YYYYMMDD) also
-admits, while Leap/SLES short numeric majors stay rejected.
+The guard preserves the existing Tumbleweed grain variants and adds
+Fedora only when os_family is RedHat and os is Fedora.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -19,6 +15,10 @@ SALT_ROOT = REPO_ROOT / "salt"
 
 TW = {"os": "openSUSE Tumbleweed", "os_family": "Suse",
       "osmajorrelease": 20250905, "osrelease": "20250905"}
+FEDORA = {"os": "Fedora", "osfullname": "Fedora Linux",
+          "os_family": "RedHat", "osrelease": "43"}
+TW_OS_ONLY = {"os": "openSUSE Tumbleweed", "os_family": "Suse",
+              "osrelease": "15.6"}
 # Tumbleweed as some minions report it: bare "SUSE" with a rolling date.
 TW_SUSE = {"os": "SUSE", "os_family": "Suse",
            "osmajorrelease": 20250905, "osrelease": "20250905"}
@@ -37,9 +37,8 @@ TW_SUSE_FULLNAME = {"os": "SUSE", "os_family": "Suse",
                     "osfullname": "openSUSE Tumbleweed",
                     "osmajorrelease": 20260922, "osrelease": "20260922"}
 
-MODULES = ("banner", "freeipa", "minion", "netbird", "profile",
-           "schedule", "systemd-resolved", "timesyncd", "trivy", "updates",
-           "usb")
+COMMON_MODULES = ("banner", "minion", "profile", "systemd-resolved",
+                  "timesyncd", "trivy", "usb")
 
 
 def render_init(grains):
@@ -52,33 +51,66 @@ def render_init(grains):
     return tpl.render(grains=grains, salt=salt)
 
 
-def test_tumbleweed_includes_modules():
+def test_tumbleweed_includes_common_modules_and_suse_group():
     rendered = render_init(dict(TW))
     assert "test.fail_without_changes" not in rendered
-    for module in MODULES:
+    for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.suse" in rendered
+    assert "- baseline.redhat" not in rendered
+
+
+
+
+def test_suse_os_grain_path_is_preserved():
+    rendered = render_init(dict(TW_OS_ONLY))
+    assert "test.fail_without_changes" not in rendered
+    assert "- baseline.suse" in rendered
+
+
+def test_family_groups_include_divergent_modules():
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(SALT_ROOT)))
+    for family in ("suse", "redhat"):
+        rendered = env.get_template(f"baseline/{family}/init.sls").render()
+        for module in ("freeipa", "netbird", "schedule", "updates"):
+            assert f"- baseline.{module}" in rendered
 
 
 def test_suse_with_rolling_date_is_admitted():
     rendered = render_init(dict(TW_SUSE))
     assert "test.fail_without_changes" not in rendered
-    for module in MODULES:
+    for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.suse" in rendered
+    assert "- baseline.redhat" not in rendered
+
+
+def test_fedora_includes_common_modules_and_redhat_group():
+    rendered = render_init(dict(FEDORA))
+    assert "test.fail_without_changes" not in rendered
+    for module in COMMON_MODULES:
+        assert f"- baseline.{module}" in rendered
+    assert "- baseline.redhat" in rendered
+    assert "- baseline.suse" not in rendered
 
 
 def test_suse_grain_with_tumbleweed_fullname_is_admitted():
     rendered = render_init(dict(TW_SUSE_FULLNAME))
     assert "test.fail_without_changes" not in rendered
-    for module in MODULES:
+    for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.suse" in rendered
+    assert "- baseline.redhat" not in rendered
 
 
 def test_other_os_fails_fast_with_grains_in_message():
     for grains in (LEAP15, LEAP16, SLES,
                    {"os": "Debian", "os_family": "Debian",
                     "osrelease": "12"},
+                   {"os": "CentOS", "os_family": "RedHat"},
                    {}):
         rendered = render_init(dict(grains))
         assert "test.fail_without_changes" in rendered
         assert "include:" not in rendered
         assert "got os=" in rendered
+        assert "os_family=" in rendered

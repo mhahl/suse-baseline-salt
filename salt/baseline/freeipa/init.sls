@@ -7,12 +7,10 @@
    shared "security OBS Project" key). Disabling removes the repo but
    keeps already-installed packages, like the croniter providers in
    baseline.schedule.
-   zypper prompts to trust a new/rotated signing key interactively and
-   fails non-interactive refreshes until it is trusted, so both states
-   below pass gpgautoimport (zypper's own --gpg-auto-import-keys):
-   same trust level as a manual rpm --import, verified against Salt's
-   zypper module (mod_repo/refresh_db honor it, and pkg.installed
-   forwards it to the resolve_capabilities refresh). #}
+   On Tumbleweed, zypper prompts to trust rotated keys, so both states
+   pass gpgautoimport (zypper's --gpg-auto-import-keys). Fedora installs
+   from base repos and does not use those zypper options. #}
+{% set _family = grains.get('os_family', '') %}
 {% set cfg = salt['pillar.get']('baseline:freeipa', {}) %}
 {% set enabled = cfg.get('enabled', True) %}
 {% set repo_name = cfg.get('repo_name', 'security:idm') %}
@@ -20,6 +18,7 @@
 {% set packages = cfg.get('packages', ['freeipa-client']) %}
 
 {% if enabled %}
+{% if _family == 'Suse' %}
 freeipa_obs_repo:
   pkgrepo.managed:
     - name: {{ repo_name }}
@@ -29,6 +28,7 @@ freeipa_obs_repo:
     - refresh: True
     - gpgcheck: 1
     - gpgautoimport: True
+{% endif %}
 
 freeipa_client:
   pkg.installed:
@@ -36,11 +36,13 @@ freeipa_client:
 {% for pkg in packages %}
       - {{ pkg }}
 {% endfor %}
+{% if _family == 'Suse' %}
     - fromrepo: {{ repo_name }}
     - gpgautoimport: True
     - require:
       - pkgrepo: freeipa_obs_repo
-{% else %}
+{% endif %}
+{% elif _family == 'Suse' %}
 freeipa_obs_repo:
   pkgrepo.absent:
     - name: {{ repo_name }}

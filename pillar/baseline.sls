@@ -16,6 +16,7 @@ baseline:
     iburst: true
 
   updates:
+    # Uses zypper dup on Tumbleweed and dnf upgrade on Fedora.
     auto_dup: false
 
   usb:
@@ -42,10 +43,9 @@ baseline:
       # the other daily jobs.
       splay: 600
 
-  # FreeIPA client (baseline.freeipa): install-only from the OBS
-  # security:idm repo for Tumbleweed. Enrollment (ipa-client-install)
-  # stays manual — it needs interactive admin credentials. Disabling
-  # removes the repo but keeps already-installed packages.
+  # FreeIPA client (baseline.freeipa): OBS security:idm repo on
+  # Tumbleweed; Fedora uses its base repo. Enrollment remains manual.
+  # Disabling removes the Tumbleweed repo but keeps installed packages.
   freeipa:
     enabled: true
     repo_name: 'security:idm'
@@ -53,10 +53,10 @@ baseline:
     packages:
       - freeipa-client
 
-  # NetBird mesh-VPN client (baseline.netbird): install + daemon from
-  # the official NetBird RPM repo. Joining (`netbird up`) stays manual —
-  # it needs an SSO login or a setup key. Disabling removes the repo and
-  # stops the daemon but keeps already-installed packages.
+  # NetBird mesh-VPN client (baseline.netbird): same official RPM repo
+  # on both platforms; zypper auto-import and Fedora gpgkey/repo_gpgcheck
+  # settings differ. Joining (`netbird up`) stays manual. Disabling removes
+  # the repo and stops the daemon but keeps installed packages.
   netbird:
     enabled: true
     repo_name: 'netbird'
