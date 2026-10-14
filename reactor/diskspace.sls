@@ -1,7 +1,8 @@
 {# Reactor: bounded cleanup when the diskspace beacon fires. This
-   baseline's disk hogs are the journal, zypper caches, and trivy data —
-   all regenerable — so vacuuming them automatically is safe. The trivy
-   report.json (mine source of truth) is kept. Feeding beacon:
+   baseline's disk hogs are the journal, zypper caches, and the trivy
+   vulnerability DB — all regenerable — so vacuuming them automatically
+   is safe. The trivy report.json (mine source of truth for Overstate's
+   Mine tab) is kept: only db/* is removed. Feeding beacon:
      beacons:
        diskspace:
          - interval: 300
@@ -22,4 +23,9 @@ disk_cleanup_zypper:
     - tgt: {{ data['id'] }}
     - arg:
       - zypper --non-interactive clean --all
+disk_cleanup_trivy_db:
+  local_cmd.run:
+    - tgt: {{ data['id'] }}
+    - arg:
+      - rm -rf /var/cache/trivy/db/*
 {% endif %}

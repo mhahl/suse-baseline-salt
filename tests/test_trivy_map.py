@@ -82,10 +82,41 @@ def test_init_always_includes_all_parts():
 
 def test_initial_scan_requires_package():
     rendered = render("baseline/trivy/scan.sls")
-    assert "onlyif: test -x /usr/bin/trivy" in rendered
+    assert "test -x /usr/local/bin/trivy" in rendered
+    assert "test -x /usr/bin/trivy" in rendered
     assert "- module: trivy_sync_modules" in rendered
     assert "- pkg: trivy_package" in rendered
     assert "trivy_binary" not in rendered
+
+
+def test_schedule_renders_daily_publish_for_overstate():
+    rendered = render("baseline/trivy/schedule.sls")
+    # Stable Overstate contracts: snake_case state ID, hyphenated job name.
+    assert "trivy_cve_scan:" in rendered
+    assert "- name: trivy-cve-scan" in rendered
+    assert "function: trivy_scan.publish" in rendered
+    assert "- days: 1" in rendered
+    assert "- splay: 600" in rendered
+    assert "- persist: True" in rendered
+    assert "- return_job: False" in rendered
+
+
+def test_schedule_splay_clamped_to_day():
+    bad = render(
+        "baseline/trivy/schedule.sls",
+        pillar={"baseline:trivy": {"schedule_splay": 999999}},
+    )
+    assert "- splay: 600" in bad
+    negative = render(
+        "baseline/trivy/schedule.sls",
+        pillar={"baseline:trivy": {"schedule_splay": -5}},
+    )
+    assert "- splay: 600" in negative
+    ok = render(
+        "baseline/trivy/schedule.sls",
+        pillar={"baseline:trivy": {"schedule_splay": 300}},
+    )
+    assert "- splay: 300" in ok
 
 
 def test_auto_dup_is_pillar_driven():

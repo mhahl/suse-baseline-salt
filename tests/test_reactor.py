@@ -77,7 +77,11 @@ def test_diskspace_cleans_only_over_threshold():
     over = render_reactor("diskspace.sls", {"id": "host1", "usage": 90})
     assert "journalctl --vacuum-size=500M" in over
     assert "zypper --non-interactive clean --all" in over
+    assert "rm -rf /var/cache/trivy/db/*" in over
     assert "- tgt: host1" in over
+    # report.json (Overstate Mine source of truth) is never removed:
+    # only the regenerable db/* cache is vacuumed.
+    assert "report.json" not in over
     assert "local_cmd.run:" not in render_reactor(
         "diskspace.sls", {"id": "host1", "usage": 40})
     # Percent-string payloads and missing fields still act: the beacon

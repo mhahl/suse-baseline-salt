@@ -5,6 +5,17 @@ OS-package scan, caches the full JSON report on the minion, and pushes
 a small summary dict to the mine under the ``trivy.scan_summary`` key.
 The mine never carries the full report. All behavior is driven by
 ``baseline:trivy`` in ``pillar/baseline.sls``.
+
+Overstate notes: the mine key and the ``trivy-cve-scan`` job name are
+stable contracts — the Schedules tab reads them via ``schedule.list``
+and the Mine tab reads ``trivy.scan_summary``. ``publish`` uses
+``mine.send`` (not ``mine_functions`` pillar) so no minion restart is
+needed, but ``mine.update`` does NOT refresh this key: it lives only
+as long as the daily schedule refreshes it (see ``schedule.sls``).
+
+``skip_db_update: True`` means offline scans only — the DB is never
+refreshed by this module. Manage it externally (e.g. a separate
+``trivy db update`` run) or scans go stale silently.
 """
 
 import datetime as _dt
@@ -31,12 +42,23 @@ def _opt(name, default=None):
 
 
 def _trivy_bin():
-    # /usr/local/bin first: that is where the formula installs the pinned
-    # binary, and it must win over a stale distro package at /usr/bin.
+    # Distro packages install /usr/bin/trivy on both Tumbleweed and
+    # Fedora. Prefer /usr/local/bin first so a manually pinned binary
+    # wins over a stale distro package — scan.sls gates on both paths
+    # so the initial scan is not skipped when only one exists.
     for candidate in ("/usr/local/bin/trivy", "/usr/bin/trivy"):
         if _os.path.exists(candidate):
             return candidate
     return "trivy"
+
+
+def _coerce_top_n(value, default=20):
+    """Clamp the mine 'top' list size to 0..100, never raises."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(100, number))
 
 
 def _trivy_version(binpath):
@@ -60,6 +82,9 @@ def _trivy_version(binpath):
 
 def _summarize(report, severities, top_n):
     """Build the mine-sized summary from a parsed Trivy JSON report."""
+    if not isinstance(severities, str):
+        severities = "HIGH,CRITICAL"
+    top_n = _coerce_top_n(top_n)
     wanted = [s.strip().upper() for s in severities.split(",") if s.strip()]
     counts = {sev: 0 for sev in wanted}
     total = 0
@@ -102,11 +127,16 @@ def scan(severities=None, top_n=None):
     """Run the Trivy OS scan, cache the full report, return the summary.
 
     Reads defaults from the ``trivy`` pillar; explicit arguments win.
+    ``top_n`` is clamped to 0..100 so the mine payload stays small for
+    Overstate's Mine browser. The cached report is chmodded 0640
+    best-effort (CVE counts are local-only, not world-readable).
     """
     severities = severities or _opt("severities", "HIGH,CRITICAL")
-    top_n = _opt("top_n", 20) if top_n is None else top_n
-    cache_dir = _opt("cache_dir", "/var/cache/trivy")
-    report_path = _opt("report_path", _os.path.join(cache_dir, "report.json"))
+    top_n = _coerce_top_n(_opt("top_n", 20) if top_n is None else top_n)
+    cache_dir = _opt("cache_dir", "/var/cache/trivy") or ""
+    default_report = _os.path.join(
+        cache_dir, "report.json") if cache_dir else "/var/cache/trivy/report.json"
+    report_path = _opt("report_path", default_report) or default_report
     binpath = _trivy_bin()
     cmd = [
         binpath, "rootfs", "/",
@@ -117,11 +147,20 @@ def scan(severities=None, top_n=None):
         "--output", report_path,
         "--quiet",
     ]
-    if _opt("cache_dir", None):
+    if cache_dir:
         cmd += ["--cache-dir", _os.path.join(cache_dir, "db")]
     if _opt("skip_db_update", False):
         cmd += ["--skip-db-update"]
-    _os.makedirs(cache_dir, exist_ok=True)
+    try:
+        if cache_dir:
+            _os.makedirs(cache_dir, exist_ok=True)
+        parent = _os.path.dirname(report_path)
+        if parent:
+            _os.makedirs(parent, exist_ok=True)
+    except OSError as exc:
+        return {"minion": __grains__.get("id", ""),  # noqa: F821
+                "error": "cannot create cache dir for {}: {}".format(
+                    report_path, exc)}
     try:
         proc = _subprocess.run(
             cmd, capture_output=True, text=True, timeout=1800,
@@ -150,7 +189,11 @@ def scan(severities=None, top_n=None):
                 "error": "unreadable report {}: {}".format(report_path, exc),
                 "retcode": proc.returncode,
                 "stderr_tail": (proc.stderr or "")[-500:]}
-    summary = _summarize(report, severities, int(top_n))
+    try:
+        _os.chmod(report_path, 0o640)
+    except OSError:
+        pass
+    summary = _summarize(report, severities, top_n)
     summary["minion"] = __grains__.get("id", "")  # noqa: F821
     summary["scanned_at"] = _dt.datetime.now(
         _dt.timezone.utc).isoformat(timespec="seconds")

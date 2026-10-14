@@ -195,3 +195,55 @@ def test_scan_missing_binary_names_the_fix(tmp_path):
     assert out["minion"] == "web01"
     assert "baseline.trivy" in out["error"]
     assert "trivy" in out["error"]
+
+
+def test_coerce_top_n_clamps_for_mine(mod):
+    assert mod._coerce_top_n(5) == 5
+    assert mod._coerce_top_n(0) == 0
+    assert mod._coerce_top_n(999) == 100
+    assert mod._coerce_top_n(-3) == 0
+    assert mod._coerce_top_n("bad") == 20
+    assert mod._coerce_top_n(None) == 20
+
+
+def test_scan_creates_nested_report_parent_and_restricts_perms(tmp_path):
+    report = {"Results": [{"Vulnerabilities": [vuln("CVE-2024-1", "CRITICAL")]}]}
+    nested = tmp_path / "nested" / "deep" / "report.json"
+
+    def fake_run(cmd, **kwargs):
+        if cmd[1:2] == ["version"]:
+            return mock.Mock(returncode=0, stdout=json.dumps(
+                {"Version": "0.74.0", "VulnerabilityDB": {}}), stderr="")
+        # Emulate trivy writing the report to --output.
+        out_idx = cmd.index("--output") + 1
+        Path(cmd[out_idx]).write_text(json.dumps(report), encoding="utf-8")
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(nested)})
+    mod._trivy_bin = lambda: "/usr/bin/trivy"  # noqa: E731 -- stub lookup
+    with mock.patch.object(mod._subprocess, "run", side_effect=fake_run):
+        out = mod.scan()
+    assert out["total"] == 1
+    assert nested.exists()
+    assert oct(nested.stat().st_mode & 0o777) == "0o640"
+
+
+def test_scan_empty_cache_dir_omits_cache_flag(tmp_path):
+    report_file = tmp_path / "report.json"
+    report_file.write_text(json.dumps({"Results": []}), encoding="utf-8")
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        if cmd[1:2] == ["version"]:
+            return mock.Mock(returncode=0, stdout="{}", stderr="")
+        seen["cmd"] = cmd
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    mod = load_module(pillar={"cache_dir": "",
+                              "report_path": str(report_file)})
+    mod._trivy_bin = lambda: "/usr/bin/trivy"  # noqa: E731 -- stub lookup
+    with mock.patch.object(mod._subprocess, "run", side_effect=fake_run):
+        out = mod.scan()
+    assert "--cache-dir" not in seen["cmd"]
+    assert out["total"] == 0
