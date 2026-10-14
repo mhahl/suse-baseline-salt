@@ -55,25 +55,35 @@ resolved_service:
     - enable: True
     - watch:
       - file: resolved_config
+{% if grains.get('selinux', {}).get('enforced', False) %}
+      - cmd: resolved_selinux_relabel
+{% endif %}
     - require:
       - pkg: systemd_resolved_package
       - file: resolv_conf_symlink
       - file: resolved_config
+{% if grains.get('selinux', {}).get('enforced', False) %}
+      - cmd: resolved_selinux_relabel
+{% endif %}
 
 {% if grains.get('selinux', {}).get('enforced', False) %}
-# SELinux-enforcing hosts: the runtime dir and the stub files the daemon
-# creates under it inherit tmpfs context, so DNS breaks until contexts are
-# restored to policy defaults. Run restorecon after the service actually
-# starts or restarts (onchanges), not on every highstate — cmd.run with
-# watch still executes unconditionally. The onlyif keeps hosts without
-# policycoreutils a green no-op; non-enforcing hosts skip this state.
-resolved_selinux_restorecon:
+# SELinux-enforcing hosts: systemd-resolved has to run in its own
+# systemd_resolved_t domain. The exec transition keys off the binary
+# carrying the systemd_resolved_exec_t file context, so on hosts whose
+# files were never (re)labelled the daemon stays in init_t — and init_t is
+# denied setattr on the net_conf_t / systemd_resolved_var_run_t files the
+# daemon manages at startup (the "won't start until permissive" failure).
+# Relabel the binary plus the runtime tree, BEFORE the service state runs.
+# The onlyif gates on the label actually being wrong, so quiet highstates
+# skip the command (no churn) while any drift self-heals; the service
+# watches it so a relabel really restarts the daemon into the right domain.
+# Hosts without policycoreutils stay green no-ops.
+resolved_selinux_relabel:
   cmd.run:
-    - name: restorecon -Rv /run/systemd/resolve
-    - onlyif: command -v restorecon
+    - name: restorecon -Rv /usr/lib/systemd/systemd-resolved /run/systemd/resolve
+    - onlyif: command -v restorecon && test -e /usr/lib/systemd/systemd-resolved && ! ls -Z /usr/lib/systemd/systemd-resolved | grep -q systemd_resolved_exec_t
     - require:
+      - file: resolved_runtime_dir
       - file: resolv_conf_symlink
-      - service: resolved_service
-    - onchanges:
-      - service: resolved_service
+      - file: resolved_config
 {% endif %}

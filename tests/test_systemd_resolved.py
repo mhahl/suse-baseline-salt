@@ -41,20 +41,21 @@ def test_netconfig_guard_always_renders():
     assert "onlyif: test -f /etc/sysconfig/network/config" in rendered
 
 
-def test_restorecon_only_when_selinux_enforced():
+def test_relabel_only_when_selinux_enforced_and_label_wrong():
     enforcing = render_init(
         {**TW, "selinux": {"enabled": True, "enforced": True}}
     )
-    assert "restorecon -Rv /run/systemd/resolve" in enforcing
-    assert "onlyif: command -v restorecon" in enforcing
-    assert "onchanges:" in enforcing
-    assert "- service: resolved_service" in enforcing
-    restorecon = enforcing.split("resolved_selinux_restorecon:", 1)[1]
-    assert "watch:" not in restorecon
+    assert "restorecon -Rv /usr/lib/systemd/systemd-resolved /run/systemd/resolve" in enforcing
+    assert "command -v restorecon && test -e /usr/lib/systemd/systemd-resolved" in enforcing
+    assert "! ls -Z /usr/lib/systemd/systemd-resolved | grep -q systemd_resolved_exec_t" in enforcing
+    # The service must require + watch the relabel so it starts in the
+    # systemd_resolved_t domain and restarts when the label is fixed.
+    assert "- cmd: resolved_selinux_relabel" in enforcing
 
     permissive = render_init(
         {**TW, "selinux": {"enabled": True, "enforced": False}}
     )
     assert "restorecon" not in permissive
+    assert "resolved_selinux_relabel" not in permissive
 
     assert "restorecon" not in render_init()
