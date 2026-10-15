@@ -61,6 +61,7 @@ def test_install_fetches_pinned_github_release():
     assert "archive.extracted:" in rendered
     assert "https://github.com/anchore/grype/releases/download/v0.120.1" in rendered
     assert "grype_0.120.1_linux_amd64.tar.gz" in rendered
+    assert "source_hash: sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d" in rendered
     assert "pkg.installed" not in rendered
     assert "/usr/local/bin/grype version" in rendered
 
@@ -75,6 +76,7 @@ def test_install_honors_version_pin_and_arch():
                  grains={"os": "Fedora", "os_family": "RedHat",
                          "osrelease": "43", "cpuarch": "aarch64"})
     assert "linux_arm64.tar.gz" in arm
+    assert "source_hash: sha256=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514" in arm
 
 
 def test_init_always_includes_all_parts():
