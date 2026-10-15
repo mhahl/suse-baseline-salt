@@ -4,8 +4,9 @@
 # `make goss-schedule` after only baseline.schedule still passes.
 # Use command greps rather than a second file: block on _schedule.conf —
 # gossfile merges would shadow the schedule.yaml block for the same path.
-# Overstate reads the same job (grype-cve-scan) via schedule.list and the
-# grype.scan_summary mine key via its Mine tab — both names are stable.
+# Overstate reads the same job (grype-cve-scan) via schedule.list and both
+# mine keys (grype.scan_summary slim, grype.scan_detail full) via its Mine
+# and Vulnerabilities tabs — all names are stable.
 
 file:
   /usr/local/bin/grype:

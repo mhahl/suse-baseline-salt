@@ -1,7 +1,8 @@
 # baseline.grype/init.sls — Grype CVE scanning: install, scan, daily schedule.
 # Apply with: salt '*' state.apply baseline.grype
 # (also included in the full baseline).
-# Mine key for the dashboard: grype.scan_summary (see README.md).
+# Mine keys for the dashboard: grype.scan_summary (slim) +
+# grype.scan_detail (full findings) — see README.md.
 
 grype_sync_modules:
   module.run:

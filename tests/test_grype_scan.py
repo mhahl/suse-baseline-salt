@@ -102,24 +102,52 @@ def test_summarize_carries_distro(mod):
     assert out["distro"] == {"name": "fedora", "version": "43"}
 
 
-def test_publish_sends_summary_under_mine_key():
+def test_publish_splits_summary_and_detail_keys():
     sent = {}
 
     def fake_send(name, *args, **kwargs):
-        sent["name"] = name
-        sent["args"] = args
-        sent["kwargs"] = kwargs
+        sent[name] = (args, kwargs)
         return True
 
     mod = load_module(salt={"mine.send": fake_send})
-    mod.scan = lambda *a, **k: {"total": 3, "top": [],  # noqa: E731 -- stub
+    mod.scan = lambda *a, **k: {"minion": "web01",  # noqa: E731 -- stub
+                                "scanned_at": "2026-10-16T00:00:00+00:00",
+                                "severity_filter": "HIGH,CRITICAL",
+                                "total": 3, "top": [],
                                 "detailed_report": [{"cve": "CVE-1"}]}
     assert mod.publish() is True
-    assert sent["name"] == mod.MINE_KEY == "grype.scan_summary"
-    # Inline data: the full result including detailed_report.
-    assert sent["kwargs"] == {}
-    assert sent["args"][0] == {"total": 3, "top": [],
-                               "detailed_report": [{"cve": "CVE-1"}]}
+    assert mod.MINE_KEY == "grype.scan_summary"
+    assert mod.MINE_DETAIL_KEY == "grype.scan_detail"
+    # Slim summary carries no detailed_report: the fleet-wide key
+    # stays small at thousands of minions.
+    summary = sent["grype.scan_summary"][0][0]
+    assert summary == {"minion": "web01",
+                       "scanned_at": "2026-10-16T00:00:00+00:00",
+                       "severity_filter": "HIGH,CRITICAL",
+                       "total": 3, "top": []}
+    # Full findings ride a separate per-minion key.
+    detail = sent["grype.scan_detail"][0][0]
+    assert detail == {"minion": "web01",
+                      "scanned_at": "2026-10-16T00:00:00+00:00",
+                      "severity_filter": "HIGH,CRITICAL",
+                      "detailed_report": [{"cve": "CVE-1"}]}
+
+
+def test_publish_error_refreshes_both_keys_against_stale_detail():
+    sent = {}
+
+    def fake_send(name, *args, **kwargs):
+        sent[name] = (args, kwargs)
+        return True
+
+    mod = load_module(salt={"mine.send": fake_send})
+    mod.scan = lambda *a, **k: {"minion": "web01",  # noqa: E731 -- stub
+                                "error": "grype exited 1"}
+    assert mod.publish() is True
+    # A failed scan must not leave yesterday's detail report behind:
+    # the error payload lands on both keys.
+    assert sent["grype.scan_summary"][0][0]["error"] == "grype exited 1"
+    assert sent["grype.scan_detail"][0][0]["error"] == "grype exited 1"
 
 
 def test_scan_returns_full_detailed_report(tmp_path):

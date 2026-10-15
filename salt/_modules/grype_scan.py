@@ -2,16 +2,19 @@
 
 Scheduled daily via :func:`publish`, which runs a ``grype dir:/``
 OS/filesystem scan, caches the full JSON report on the minion, and pushes
-a small summary dict to the mine under the ``grype.scan_summary`` key.
-The mine never carries the full report. All behavior is driven by
-``baseline:grype`` in ``pillar/baseline.sls``.
+two mine keys: a slim summary under ``grype.scan_summary`` (counts,
+``top`` list, metadata) for fleet-wide readers, and the complete
+findings under ``grype.scan_detail`` for per-minion readers. The mine
+never carries the raw multi-megabyte Grype JSON. All behavior is driven
+by ``baseline:grype`` in ``pillar/baseline.sls``.
 
-Overstate notes: the mine key and the ``grype-cve-scan`` job name are
-stable contracts — the Schedules tab reads them via ``schedule.list``
-and the Mine tab reads ``grype.scan_summary``. ``publish`` uses
-``mine.send`` (not ``mine_functions`` pillar) so no minion restart is
-needed, but ``mine.update`` does NOT refresh this key: it lives only
-as long as the daily schedule refreshes it (see ``schedule.sls``).
+Overstate notes: both mine keys and the ``grype-cve-scan`` job name are
+stable contracts — the Schedules tab reads them via ``schedule.list``,
+the Mine tab reads ``grype.scan_summary``, and the Vulnerabilities UI
+reads both keys. ``publish`` uses ``mine.send`` (not ``mine_functions``
+pillar) so no minion restart is needed, but ``mine.update`` does NOT
+refresh either key: they live only as long as the daily schedule
+refreshes them (see ``schedule.sls``).
 
 ``skip_db_update: True`` means offline scans only — the DB is never
 refreshed by this module. Manage it externally (e.g. ``grype db update``)
@@ -25,6 +28,7 @@ import os as _os
 import subprocess as _subprocess
 
 MINE_KEY = "grype.scan_summary"
+MINE_DETAIL_KEY = "grype.scan_detail"
 
 _SEVERITY_RANK = {
     "CRITICAL": 0,
@@ -198,9 +202,11 @@ def scan(severities=None, top_n=None):
 
     The return holds a slim ``top`` list plus a full ``detailed_report``
     list (every wanted finding, with namespace/urls for triage).
-    :func:`publish` pushes the whole result to the mine — size is
-    bounded by the wanted severities, roughly a few hundred KB per
-    minion at ~1,000 findings. Watch Redis memory as the fleet grows.
+    :func:`publish` splits the return across two mine keys — the slim
+    summary (no ``detailed_report``) for fleet-wide readers and the
+    complete findings for per-minion readers — so a 1000-finding host
+    does not push ~200KB per minion into the shared mine key on every
+    run. The raw multi-megabyte Grype JSON stays on the minion.
     """
     severities = severities or _opt("severities", "HIGH,CRITICAL")
     top_n = _coerce_top_n(_opt("top_n", 20) if top_n is None else top_n)
@@ -270,15 +276,41 @@ def scan(severities=None, top_n=None):
 
 
 def publish():
-    """Run :func:`scan` and push the full result to the mine.
+    """Run :func:`scan` and push the summary and detail to the mine.
 
     This is the function the daily schedule calls. Uses ``mine.send``
-    with inline data carrying the complete ``detailed_report`` list
-    (every wanted finding with namespace/urls) alongside the slim
-    ``top`` summary — the Mine tab shows the whole picture with no
-    extra Jobs lookup. Needs no ``mine_functions`` minion config (and
-    no minion restart); the result lands under the
-    ``grype.scan_summary`` key. The raw multi-megabyte Grype JSON stays
-    on the minion at ``report_path`` by design.
+    with inline data (not ``mine_function``) so no minion restart is
+    needed. Two keys are written so fleet-wide readers stay cheap at
+    thousands of minions:
+
+    * ``grype.scan_summary`` — slim summary only (counts, fixable
+      total, ``top`` list, distro, scan metadata). No
+      ``detailed_report``: a 1000-finding host would otherwise push
+      ~200KB per minion into the shared mine on every run.
+    * ``grype.scan_detail`` — ``minion``, ``scanned_at``,
+      ``severity_filter`` plus the complete ``detailed_report`` list
+      (every wanted finding with namespace/urls) for per-minion
+      readers.
+
+    Error results (failed scan) carry no ``detailed_report`` and are
+    sent to both keys, so a failed run never leaves yesterday's
+    detail report behind as a stale success. The raw multi-megabyte
+    Grype JSON stays on the minion at ``report_path`` by design.
     """
-    return __salt__["mine.send"](MINE_KEY, scan())  # noqa: F821
+    result = scan()
+    mine_send = __salt__["mine.send"]  # noqa: F821
+    if isinstance(result.get("detailed_report"), list):
+        detail = {
+            "minion": result.get("minion", ""),
+            "scanned_at": result.get("scanned_at", ""),
+            "severity_filter": result.get("severity_filter", ""),
+            "detailed_report": result["detailed_report"],
+        }
+        summary = {k: v for k, v in result.items() if k != "detailed_report"}
+        return bool(
+            mine_send(MINE_KEY, summary)
+            and mine_send(MINE_DETAIL_KEY, detail)
+        )
+    return bool(
+        mine_send(MINE_KEY, result) and mine_send(MINE_DETAIL_KEY, result)
+    )

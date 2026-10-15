@@ -1,8 +1,9 @@
 {# baseline/grype/map.jinja — pillar-overridable defaults.
    Grype ships no distro package on either platform: install.sls fetches
    the pinned GitHub release tarball to /usr/local/bin/grype over TLS.
-   Overstate contracts: the grype-cve-scan job name and the
-   grype.scan_summary mine key are stable — do not rename.
+   Overstate contracts: the grype-cve-scan job name and both mine
+   keys (grype.scan_summary slim + grype.scan_detail full) are stable —
+   do not rename.
    skip_db_update=True means offline scans only: manage the DB
    externally (grype db update) or results go stale.
    schedule_splay is clamped 0..86400 in schedule.sls (default 600).

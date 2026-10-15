@@ -1,11 +1,13 @@
 {% from "baseline/grype/map.jinja" import grype with context %}
 # baseline.grype/schedule.sls — daily grype_scan.publish, persisted to the minion
-# config so it survives restarts. publish() scans and pushes the summary
-# to the mine via mine.send (no mine_functions config, no restart needed).
-# Overstate: the job name grype-cve-scan and the mine key
-# grype.scan_summary are stable contracts for the Schedules/Mine tabs.
-# mine.update does NOT refresh this key — it lives only as long as this
-# daily job refreshes it (default Salt mine_interval is 60m, so a missed
+# config so it survives restarts. publish() scans and pushes two mine keys
+# via mine.send (no mine_functions config, no restart needed): the slim
+# summary and the full detail report.
+# Overstate: the job name grype-cve-scan and both mine keys
+# grype.scan_summary + grype.scan_detail are stable contracts for the
+# Schedules/Mine/Vulnerabilities tabs.
+# mine.update does NOT refresh these keys — they live only as long as this
+# daily job refreshes them (default Salt mine_interval is 60m, so a missed
 # run leaves a stale/missing entry until the next success).
 
 # NOTE: the state ID is snake_case but the scheduled job keeps its

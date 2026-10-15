@@ -76,13 +76,14 @@ baseline:
       - 139.99.149.92   # salt-c010.overstate.syd.prod
 
   # Grype CVE scanning (baseline.grype): daily filesystem scans with a
-  # small summary published to the Salt Mine under grype.scan_summary
-  # (counts, fixable total, top 20 CVEs, distro). All keys are optional.
-  # Overstate: the grype-cve-scan job name and grype.scan_summary mine
-  # key are stable (Schedules/Mine tabs). publish() uses mine.send, not
-  # mine_functions below — mine.update does NOT refresh this key, so a
-  # missed daily run leaves a stale/missing entry until the next success
-  # (default mine_interval 60m). skip_db_update True = offline scans
+  # slim summary published to the Salt Mine under grype.scan_summary
+  # (counts, fixable total, top 20 CVEs, distro) plus the full findings
+  # under grype.scan_detail. All keys are optional.
+  # Overstate: the grype-cve-scan job name and both grype.scan_* mine
+  # keys are stable (Schedules/Mine/Vulnerabilities tabs). publish() uses
+  # mine.send, not mine_functions below — mine.update does NOT refresh
+  # these keys, so a missed daily run leaves stale/missing entries until
+  # the next success (default mine_interval 60m). skip_db_update True = offline scans
   # only: refresh the DB externally (grype db update) or results go
   # stale. Report is stored 0640 (local-only). splay is clamped
   # 0..86400 in schedule.sls; top_n is clamped 0..100 in the module.
