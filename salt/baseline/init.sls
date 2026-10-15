@@ -14,7 +14,7 @@ include:
   - baseline.profile
   - baseline.systemd-resolved
   - baseline.timesyncd
-  - baseline.trivy
+  - baseline.grype
   - baseline.usb
 {% if _is_tw %}
   - baseline.suse

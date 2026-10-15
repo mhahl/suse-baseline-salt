@@ -1,0 +1,20 @@
+{# baseline/grype/map.jinja — pillar-overridable defaults.
+   Grype ships no distro package on either platform: install.sls fetches
+   the pinned GitHub release tarball to /usr/local/bin/grype over TLS.
+   Overstate contracts: the grype-cve-scan job name and the
+   grype.scan_summary mine key are stable — do not rename.
+   skip_db_update=True means offline scans only: manage the DB
+   externally (grype db update) or results go stale.
+   schedule_splay is clamped 0..86400 in schedule.sls (default 600).
+   top_n is clamped 0..100 in grype_scan.py (default 20). #}
+{% set grype = {
+  'version': 'v0.120.1',
+  'severities': 'HIGH,CRITICAL',
+  'top_n': 20,
+  'skip_db_update': False,
+  'cache_dir': '/var/cache/grype',
+  'report_path': '/var/cache/grype/report.json',
+  'run_initial_scan': True,
+  'schedule_splay': 600,
+} %}
+{% do grype.update(salt['pillar.get']('baseline:grype', {})) %}

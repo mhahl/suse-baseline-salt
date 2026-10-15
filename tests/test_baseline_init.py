@@ -38,7 +38,7 @@ TW_SUSE_FULLNAME = {"os": "SUSE", "os_family": "Suse",
                     "osmajorrelease": 20260922, "osrelease": "20260922"}
 
 COMMON_MODULES = ("banner", "minion", "profile", "systemd-resolved",
-                  "timesyncd", "trivy", "usb")
+                  "timesyncd", "grype", "usb")
 
 
 def render_init(grains):

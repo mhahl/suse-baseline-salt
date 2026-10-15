@@ -1,6 +1,6 @@
 """Render tests for the baseline sync-modules schedule job.
 
-Custom execution modules (``trivy_scan`` and friends) only reach minions
+Custom execution modules (``grype_scan`` and friends) only reach minions
 via ``saltutil.sync_modules``. Relying on the next highstate leaves a
 window where the master serves new module code but minions still run the
 old copy, so a daily sync job closes the gap. These tests render the real

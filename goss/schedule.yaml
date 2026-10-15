@@ -6,7 +6,7 @@
 # The nightly highstate uses a cron expression, which needs the croniter
 # module importable by the minion (versioned system RPM matching the
 # minion's interpreter, and/or croniter in Salt's own Python for
-# onedir/venv minions). Trivy job names live in goss/trivy.yaml so this
+# onedir/venv minions). Grype job names live in goss/grype.yaml so this
 # file stays valid after baseline.schedule alone. The RPM names carry the
 # interpreter version (python313-*, python314-*), so assert behavior —
 # importability — instead of a version-locked package name.

@@ -85,7 +85,7 @@ rm -f /srv/pillar/pillar
 # /srv/pillar) would nest it as /srv/pillar/pillar instead.
 if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
     ln -sfn "$REPO_ROOT/salt/baseline" /srv/salt/baseline
-    # Custom execution modules (trivy_scan) live next to states, not inside
+    # Custom execution modules (grype_scan) live next to states, not inside
     # baseline/. A traditional minion file_roots of /srv/salt needs this.
     ln -sfn "$REPO_ROOT/salt/_modules" /srv/salt/_modules
 

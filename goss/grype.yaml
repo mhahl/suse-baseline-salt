@@ -1,0 +1,34 @@
+# Goss tests for baseline.grype
+#
+# Schedule job names are asserted here (not in goss/schedule.yaml) so
+# `make goss-schedule` after only baseline.schedule still passes.
+# Use command greps rather than a second file: block on _schedule.conf —
+# gossfile merges would shadow the schedule.yaml block for the same path.
+# Overstate reads the same job (grype-cve-scan) via schedule.list and the
+# grype.scan_summary mine key via its Mine tab — both names are stable.
+
+file:
+  /usr/local/bin/grype:
+    exists: true
+    mode: "0755"
+    title: "grype binary is installed"
+  /var/cache/grype/report.json:
+    exists: true
+    mode: "0640"
+    owner: root
+    group: root
+    title: "grype vulnerability report exists with restricted perms"
+
+command:
+  "grep -q grype-cve-scan /etc/salt/minion.d/_schedule.conf":
+    exit-status: 0
+    title: "grype-cve-scan schedule is present"
+  "grep -q grype_scan.publish /etc/salt/minion.d/_schedule.conf":
+    exit-status: 0
+    title: "grype_scan.publish is scheduled"
+  "python3 -m json.tool /var/cache/grype/report.json >/dev/null":
+    exit-status: 0
+    title: "grype report is valid JSON"
+  "grep -q 'persist: True' /etc/salt/minion.d/_schedule.conf":
+    exit-status: 0
+    title: "grype schedule persists across restarts"

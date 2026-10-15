@@ -5,7 +5,7 @@ gossfile:
   schedule.yaml: {}
   systemd-resolved.yaml: {}
   timesyncd.yaml: {}
-  trivy.yaml: {}
+  grype.yaml: {}
   usb.yaml: {}
   fedora/freeipa.yaml: {}
   fedora/netbird.yaml: {}

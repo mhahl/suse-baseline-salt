@@ -67,7 +67,7 @@ baseline_highstate_nightly:
     - name: highstate-nightly
 {% endif %}
 
-{# Custom execution modules (trivy_scan and friends) only reach minions
+{# Custom execution modules (grype_scan and friends) only reach minions
    via saltutil.sync_modules. The nightly highstate syncs as a side
    effect, but a dedicated daily job closes the window where the master
    already serves new module code while minions still run the old copy. #}

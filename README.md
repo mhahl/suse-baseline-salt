@@ -15,16 +15,16 @@
 | Category | Modules |
 |----------|---------|
 | **Supported OS** | openSUSE Tumbleweed, Fedora |
-| **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `trivy`, `freeipa`, `netbird`, `minion` |
+| **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `grype`, `freeipa`, `netbird`, `minion` |
 | **Hardening** | `usb` |
 
 - **Forensic-ready** bash history and session controls
 - **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP via systemd-timesyncd — the only NTP client here)
 - **Modern security controls** (USB storage blocking)
-- **Vulnerability scanning** — daily Trivy OS-package scans with summaries published to the Salt Mine (`trivy.scan_summary`)
+- **Vulnerability scanning** — daily Grype filesystem scans with summaries published to the Salt Mine (`grype.scan_summary`)
 - **Identity and mesh VPN clients** — FreeIPA from OBS on Tumbleweed or Fedora base repositories, and NetBird from its official repo (clients only; enrollment/join stays manual)
 - **Overstate-ready scheduling** — hourly mine updates, nightly highstate, and daily jobs, visible in Overstate's Schedules tab
-- **Pillar-driven** — DNS, NTP, USB, schedule, trivy, freeipa, netbird, and update behavior are configurable via pillar
+- **Pillar-driven** — DNS, NTP, USB, schedule, grype, freeipa, netbird, and update behavior are configurable via pillar
 
 ---
 
@@ -106,7 +106,7 @@ CI runs separate `opensuse-tumbleweed` and `fedora-latest` container jobs ([`.fo
 ```
 salt/
 ├── _modules/               # custom execution modules (synced automatically)
-│   └── trivy_scan.py       # scan/publish for the trivy module
+│   └── grype_scan.py       # scan/publish for the grype module
 └── baseline/               # Salt modules plus shared and family includes
     ├── init.sls            # grain guard + shared module includes
     ├── redhat/             # Fedora group includes freeipa, netbird, schedule, updates
@@ -119,7 +119,7 @@ salt/
     ├── schedule/           # mine-update-hourly, highstate-nightly, sync-modules-daily
     ├── systemd-resolved/   # DoT resolvers + stub symlink + netconfig guard
     ├── timesyncd/          # NTP via systemd-timesyncd
-    ├── trivy/              # install + scan + daily schedule + clean
+    ├── grype/              # install + scan + daily schedule + clean
     ├── updates/            # zypp on Tumbleweed; minimal DNF config + optional upgrade on Fedora
     └── usb/                # USB mass-storage blacklist
 
@@ -130,7 +130,7 @@ pillar/
 reactor/                     # master-side examples (needs reactor.conf wiring below)
 ├── service.sls             # service beacon → restart resolved/timesyncd
 ├── inotify.sls             # inotify beacon → re-apply owning module / audit line
-├── diskspace.sls           # diskspace beacon → vacuum journal + zypper clean + trivy db (keeps report.json)
+├── diskspace.sls           # diskspace beacon → vacuum journal + zypper clean + grype db (keeps report.json)
 └── reactor.conf.example    # master wiring (file_roots + tag map)
 
 tests/                       # pytest render/unit tests, one file per module
@@ -173,10 +173,10 @@ salt-call schedule.list
 salt-call mine.update && salt-call mine.get '*' grains.items
 
 # Vulnerability scanning (report is 0640, mine key is mine.send-only)
-ls -l /var/cache/trivy/report.json
-python3 -m json.tool /var/cache/trivy/report.json >/dev/null
-salt-call trivy_scan.publish
-salt-run mine.get '*' trivy.scan_summary
+ls -l /var/cache/grype/report.json
+python3 -m json.tool /var/cache/grype/report.json >/dev/null
+salt-call grype_scan.publish
+salt-run mine.get tgt='*' fun='grype.scan_summary'
 ```
 
 ---
@@ -212,15 +212,15 @@ Overstate ships file roots only — add pillar roots on the master (`/etc/salt/m
 
 1. Install the minion, point it at the master, and **accept the key by fingerprint** (`auto_accept` stays off outside dev).
 2. Jobs → new job → target `*` → function `state.apply` → args `baseline`. Dry-run first with `test=True`.
-3. Minion detail → **Mine** tab shows grains/addresses after the first push, plus `trivy.scan_summary` after the first scan; the **Schedules** tab shows `mine-update-hourly`, `highstate-nightly`, `sync-modules-daily`, and `trivy-cve-scan`.
+3. Minion detail → **Mine** tab shows grains/addresses after the first push, plus `grype.scan_summary` after the first scan; the **Schedules** tab shows `mine-update-hourly`, `highstate-nightly`, `sync-modules-daily`, and `grype-cve-scan`.
 
 ### 5. What runs itself afterwards
 
 - **Hourly**: `mine-update-hourly` runs `mine.update`, refreshing the Mine data Overstate browses (grains/addresses from `mine_functions`).
 - **Nightly**: `highstate-nightly` runs `state.highstate` at `02:17` (splayed, so the fleet doesn't stampede the master).
-- **Daily**: `sync-modules-daily` syncs custom execution modules, and `trivy-cve-scan` refreshes the vulnerability DB, re-scans, and pushes a fresh mine summary via `mine.send` under the stable `trivy.scan_summary` key.
-- `trivy.scan_summary` is **not** part of `mine_functions` (no restart needed) and is **not** refreshed by `mine.update`: a missed daily run leaves a stale/missing entry until the next success. `skip_db_update: True` means offline scans only — refresh the DB externally (`trivy db update`) or results go stale.
-- Tune or disable any of them in pillar under `baseline:schedule`; disabling a job removes it from the minion instead of leaving a stale schedule behind. `baseline:trivy:schedule_splay` is clamped 0..86400 (default 600); `top_n` is clamped 0..100 (default 20) so the Mine payload stays small.
+- **Daily**: `sync-modules-daily` syncs custom execution modules, and `grype-cve-scan` updates the vulnerability DB, re-scans, and pushes a fresh mine summary via `mine.send` under the stable `grype.scan_summary` key.
+- `grype.scan_summary` is **not** part of `mine_functions` (no restart needed) and is **not** refreshed by `mine.update`: a missed daily run leaves a stale/missing entry until the next success. `skip_db_update: True` means offline scans only — refresh the DB externally (`grype db update`) or results go stale.
+- Tune or disable any of them in pillar under `baseline:schedule`; disabling a job removes it from the minion instead of leaving a stale schedule behind. `baseline:grype:schedule_splay` is clamped 0..86400 (default 600); `top_n` is clamped 0..100 (default 20) so the Mine payload stays small.
 
 ### 6. Reactor (optional, master-side)
 
@@ -230,7 +230,7 @@ Overstate ships file roots only — add pillar roots on the master (`/etc/salt/m
 |---|---|---|
 | service beacon: resolved/timesyncd down | `reactor/service.sls` | `service.start` on that minion |
 | inotify beacon: baseline file changed | `reactor/inotify.sls` | re-apply the owning `baseline.*` module |
-| diskspace beacon: usage ≥ 85% | `reactor/diskspace.sls` | vacuum journal + `zypper clean` + `rm -rf /var/cache/trivy/db/*` (keeps `report.json`) |
+| diskspace beacon: usage ≥ 85% | `reactor/diskspace.sls` | vacuum journal + `zypper clean` + `rm -rf /var/cache/grype/db/*` (keeps `report.json`) |
 
 Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/reactor.conf.example` to `/etc/salt/master.d/reactor.conf` and reload the master; confirm live tags with `salt-run state.event pretty=True`. Guards are fail-closed, and minion beacons themselves are not in this baseline yet — each example header shows the beacon block that feeds it.
 
@@ -265,7 +265,7 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 ### Conventions
 
 - **Branch on `os_family` only for platform differences.** Keep common modules shared; use the Suse and RedHat include groups for divergent states. Validate Tumbleweed grains with the existing fullname/`os`/rolling-release paths, and Fedora with `os_family=RedHat` plus `os=Fedora`. New external repos must be Salt-managed with `gpgcheck` and documented key provenance.
-- **State IDs are `snake_case`** (`trivy_cache_dir`). Never reuse a scheduled job's name as a state ID — pass it via `- name:` instead.
+- **State IDs are `snake_case`** (`grype_cache_dir`). Never reuse a scheduled job's name as a state ID — pass it via `- name:` instead.
 - **All baseline pillar nests under `baseline:`**. The only top-level exception is `mine_functions`, which Salt reads exclusively from the pillar root.
-- **Pillar merges live in `map.jinja`** (trivy); SLS files stay declarative.
+- **Pillar merges live in `map.jinja`** (grype); SLS files stay declarative.
 - **Disabling removes.** A disabled module removes what it manages (repo, schedule, config) but keeps already-installed packages — never leave a running job behind.

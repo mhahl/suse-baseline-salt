@@ -75,24 +75,25 @@ baseline:
       - 139.99.210.170  # salt-b2b6.overstate.syd.prod
       - 139.99.149.92   # salt-c010.overstate.syd.prod
 
-  # Trivy CVE scanning (baseline.trivy): daily OS-package scans with a
-  # small summary published to the Salt Mine under trivy.scan_summary
-  # (counts, fixable total, top 20 CVEs). All keys are optional.
-  # Overstate: the trivy-cve-scan job name and trivy.scan_summary mine
+  # Grype CVE scanning (baseline.grype): daily filesystem scans with a
+  # small summary published to the Salt Mine under grype.scan_summary
+  # (counts, fixable total, top 20 CVEs, distro). All keys are optional.
+  # Overstate: the grype-cve-scan job name and grype.scan_summary mine
   # key are stable (Schedules/Mine tabs). publish() uses mine.send, not
   # mine_functions below — mine.update does NOT refresh this key, so a
   # missed daily run leaves a stale/missing entry until the next success
   # (default mine_interval 60m). skip_db_update True = offline scans
-  # only: refresh the DB externally (trivy db update) or results go
+  # only: refresh the DB externally (grype db update) or results go
   # stale. Report is stored 0640 (local-only). splay is clamped
   # 0..86400 in schedule.sls; top_n is clamped 0..100 in the module.
-  trivy:
-    pkg_version: ''       # exact package pin (empty = repo latest)
+  # version pins the GitHub release (binary to /usr/local/bin/grype).
+  grype:
+    version: 'v0.120.1'   # GitHub release tag, e.g. v0.120.1
     severities: 'HIGH,CRITICAL'
     top_n: 20             # CVEs kept in the mine summary 'top' list (0..100)
     skip_db_update: False # True = offline scans only, manage DB separately
-    cache_dir: '/var/cache/trivy'
-    report_path: '/var/cache/trivy/report.json'
+    cache_dir: '/var/cache/grype'
+    report_path: '/var/cache/grype/report.json'
     run_initial_scan: True  # one scan on first apply (skipped if a report exists)
     schedule_splay: 600     # seconds of random delay so the fleet scans evenly (0..86400)
 
