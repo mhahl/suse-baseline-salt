@@ -172,11 +172,11 @@ cat /etc/salt/minion.d/_schedule.conf
 salt-call schedule.list
 salt-call mine.update && salt-call mine.get '*' grains.items
 
-# Vulnerability scanning (report is 0640, mine holds the slim summary only)
+# Vulnerability scanning (report is 0640, full result incl. detail goes to mine)
 ls -l /var/cache/grype/report.json
 python3 -m json.tool /var/cache/grype/report.json >/dev/null
-salt-call grype_scan.scan | head -60          # full detail incl. detailed_report
-salt-call grype_scan.publish                  # slim summary -> mine
+salt-call grype_scan.scan | head -60          # same payload publish() pushes
+salt-call grype_scan.publish                  # full result -> mine
 salt-run mine.get tgt='*' fun='grype.scan_summary'
 ```
 
@@ -219,7 +219,7 @@ Overstate ships file roots only — add pillar roots on the master (`/etc/salt/m
 
 - **Hourly**: `mine-update-hourly` runs `mine.update`, refreshing the Mine data Overstate browses (grains/addresses from `mine_functions`).
 - **Nightly**: `highstate-nightly` runs `state.highstate` at `02:17` (splayed, so the fleet doesn't stampede the master).
-- **Daily**: `sync-modules-daily` syncs custom execution modules, and `grype-cve-scan` updates the vulnerability DB, re-scans, and pushes a fresh mine summary via `mine.send` under the stable `grype.scan_summary` key. The mine holds the slim summary only (`counts`, `total`, `fixable`, `top`, `distro`, versions, `scanned_at`); the full `detailed_report` list (every finding with namespace/urls) rides in the `grype_scan.scan` job return — read it in Overstate Jobs → job detail instead of the Mine tab.
+- **Daily**: `sync-modules-daily` syncs custom execution modules, and `grype-cve-scan` updates the vulnerability DB, re-scans, and pushes the full result via `mine.send` under the stable `grype.scan_summary` key — slim summary (`counts`, `total`, `fixable`, `top`, `distro`, versions, `scanned_at`) plus the complete `detailed_report` list (every finding with namespace/urls), so the Mine tab shows the whole picture with no extra lookup. The raw multi-megabyte Grype JSON stays on the minion at `report_path`; watch Redis memory as the fleet grows.
 - `grype.scan_summary` is **not** part of `mine_functions` (no restart needed) and is **not** refreshed by `mine.update`: a missed daily run leaves a stale/missing entry until the next success. `skip_db_update: True` means offline scans only — refresh the DB externally (`grype db update`) or results go stale.
 - Tune or disable any of them in pillar under `baseline:schedule`; disabling a job removes it from the minion instead of leaving a stale schedule behind. `baseline:grype:schedule_splay` is clamped 0..86400 (default 600); `top_n` is clamped 0..100 (default 20) so the Mine payload stays small.
 

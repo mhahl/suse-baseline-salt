@@ -198,10 +198,9 @@ def scan(severities=None, top_n=None):
 
     The return holds a slim ``top`` list plus a full ``detailed_report``
     list (every wanted finding, with namespace/urls for triage).
-    :func:`publish` strips ``detailed_report`` before pushing to the
-    mine — a 1000-finding host would otherwise push ~200KB per minion
-    into the shared mine on every run. Read the detail on demand via
-    ``grype_scan.scan`` (Overstate Jobs → job return).
+    :func:`publish` pushes the whole result to the mine — size is
+    bounded by the wanted severities, roughly a few hundred KB per
+    minion at ~1,000 findings. Watch Redis memory as the fleet grows.
     """
     severities = severities or _opt("severities", "HIGH,CRITICAL")
     top_n = _coerce_top_n(_opt("top_n", 20) if top_n is None else top_n)
@@ -271,15 +270,15 @@ def scan(severities=None, top_n=None):
 
 
 def publish():
-    """Run :func:`scan` and push the slim summary to the mine.
+    """Run :func:`scan` and push the full result to the mine.
 
     This is the function the daily schedule calls. Uses ``mine.send``
-    with inline data (not ``mine_function``) so the bulky
-    ``detailed_report`` list is stripped first — the mine keeps counts,
-    the ``top`` list and metadata only. Needs no ``mine_functions``
-    minion config (and no minion restart); the result lands under the
-    ``grype.scan_summary`` key.
+    with inline data carrying the complete ``detailed_report`` list
+    (every wanted finding with namespace/urls) alongside the slim
+    ``top`` summary — the Mine tab shows the whole picture with no
+    extra Jobs lookup. Needs no ``mine_functions`` minion config (and
+    no minion restart); the result lands under the
+    ``grype.scan_summary`` key. The raw multi-megabyte Grype JSON stays
+    on the minion at ``report_path`` by design.
     """
-    result = scan()
-    result.pop("detailed_report", None)
-    return __salt__["mine.send"](MINE_KEY, result)  # noqa: F821
+    return __salt__["mine.send"](MINE_KEY, scan())  # noqa: F821

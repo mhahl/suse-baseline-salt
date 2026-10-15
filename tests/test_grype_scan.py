@@ -116,9 +116,10 @@ def test_publish_sends_summary_under_mine_key():
                                 "detailed_report": [{"cve": "CVE-1"}]}
     assert mod.publish() is True
     assert sent["name"] == mod.MINE_KEY == "grype.scan_summary"
-    # Inline data (no mine_function), details stripped for mine size.
+    # Inline data: the full result including detailed_report.
     assert sent["kwargs"] == {}
-    assert sent["args"][0] == {"total": 3, "top": []}
+    assert sent["args"][0] == {"total": 3, "top": [],
+                               "detailed_report": [{"cve": "CVE-1"}]}
 
 
 def test_scan_returns_full_detailed_report(tmp_path):
