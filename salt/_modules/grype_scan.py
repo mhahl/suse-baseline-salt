@@ -158,16 +158,22 @@ def _summarize(report, severities, top_n):
             "installed": str(artifact.get("version", "")),
             "fixed": fixed,
             "severity": sev,
+            "namespace": str(vuln.get("namespace", "")),
+            "urls": [str(u) for u in vuln.get("urls", [])
+                     if str(u)] if isinstance(vuln.get("urls"), list) else [],
         })
     findings.sort(key=lambda f: (_SEVERITY_RANK.get(f["severity"], 99),
                                  f["cve"]))
+    slim_keys = ("cve", "pkg", "installed", "fixed", "severity")
     return {
         "severity_filter": ",".join(wanted),
         "counts": counts,
         "total": total,
         "fixable": fixable,
-        "top": findings[:top_n],
+        "top": [{k: f[k] for k in slim_keys}
+                for f in findings[:top_n]],
         "distro": distro,
+        "detailed_report": findings,
     }
 
 
@@ -180,7 +186,7 @@ def _scan_env(cache_dir, skip_db_update):
 
 
 def scan(severities=None, top_n=None):
-    """Run the Grype filesystem scan, cache the full report, return the summary.
+    """Run the Grype filesystem scan, cache the full report, return everything.
 
     Reads defaults from the ``grype`` pillar; explicit arguments win.
     ``top_n`` is clamped to 0..100 so the mine payload stays small for
@@ -189,6 +195,13 @@ def scan(severities=None, top_n=None):
     Severity filtering happens in :func:`_summarize` — Grype has no
     server-side severity flag, so the CLI always scans everything and
     the mine keeps only the wanted severities.
+
+    The return holds a slim ``top`` list plus a full ``detailed_report``
+    list (every wanted finding, with namespace/urls for triage).
+    :func:`publish` strips ``detailed_report`` before pushing to the
+    mine — a 1000-finding host would otherwise push ~200KB per minion
+    into the shared mine on every run. Read the detail on demand via
+    ``grype_scan.scan`` (Overstate Jobs → job return).
     """
     severities = severities or _opt("severities", "HIGH,CRITICAL")
     top_n = _coerce_top_n(_opt("top_n", 20) if top_n is None else top_n)
@@ -252,16 +265,21 @@ def scan(severities=None, top_n=None):
     summary["minion"] = __grains__.get("id", "")  # noqa: F821
     summary["scanned_at"] = _dt.datetime.now(
         _dt.timezone.utc).isoformat(timespec="seconds")
+    summary["report_path"] = report_path
     summary.update(_grype_version(binpath, env=env))
     return summary
 
 
 def publish():
-    """Run :func:`scan` and push the summary to the mine.
+    """Run :func:`scan` and push the slim summary to the mine.
 
     This is the function the daily schedule calls. Uses ``mine.send``
-    so no ``mine_functions`` minion config (and no minion restart) is
-    needed; the result lands under the ``grype.scan_summary`` key.
+    with inline data (not ``mine_function``) so the bulky
+    ``detailed_report`` list is stripped first — the mine keeps counts,
+    the ``top`` list and metadata only. Needs no ``mine_functions``
+    minion config (and no minion restart); the result lands under the
+    ``grype.scan_summary`` key.
     """
-    return __salt__["mine.send"](  # noqa: F821
-        MINE_KEY, mine_function="grype_scan.scan")
+    result = scan()
+    result.pop("detailed_report", None)
+    return __salt__["mine.send"](MINE_KEY, result)  # noqa: F821

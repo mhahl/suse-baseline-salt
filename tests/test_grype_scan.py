@@ -92,7 +92,7 @@ def test_summarize_empty_report(mod):
     assert out == {"severity_filter": "HIGH,CRITICAL",
                    "counts": {"HIGH": 0, "CRITICAL": 0},
                    "total": 0, "fixable": 0, "top": [],
-                   "distro": {}}
+                   "distro": {}, "detailed_report": []}
 
 
 def test_summarize_carries_distro(mod):
@@ -112,10 +112,38 @@ def test_publish_sends_summary_under_mine_key():
         return True
 
     mod = load_module(salt={"mine.send": fake_send})
-    mod.scan = lambda *a, **k: {"total": 3}  # noqa: E731 -- stub the scan
+    mod.scan = lambda *a, **k: {"total": 3, "top": [],  # noqa: E731 -- stub
+                                "detailed_report": [{"cve": "CVE-1"}]}
     assert mod.publish() is True
     assert sent["name"] == mod.MINE_KEY == "grype.scan_summary"
-    assert sent["kwargs"] == {"mine_function": "grype_scan.scan"}
+    # Inline data (no mine_function), details stripped for mine size.
+    assert sent["kwargs"] == {}
+    assert sent["args"][0] == {"total": 3, "top": []}
+
+
+def test_scan_returns_full_detailed_report(tmp_path):
+    report = {"matches": [match("CVE-2024-{}".format(i), "High")
+                          for i in range(5)]}
+    report_file = tmp_path / "report.json"
+    report_file.write_text(json.dumps(report), encoding="utf-8")
+
+    def fake_run(cmd, **kwargs):
+        if cmd[1:2] in (["version"], ["db"]):
+            return mock.Mock(returncode=0, stdout="{}", stderr="")
+        return mock.Mock(returncode=0, stdout="", stderr="")
+
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(report_file),
+                              "top_n": 2})
+    mod._grype_bin = lambda: "/usr/local/bin/grype"  # noqa: E731 -- stub
+    with mock.patch.object(mod._subprocess, "run", side_effect=fake_run):
+        out = mod.scan()
+    assert len(out["detailed_report"]) == 5
+    assert len(out["top"]) == 2
+    assert all("namespace" in f and "urls" in f
+               for f in out["detailed_report"])
+    assert set(out["top"][0]) == {"cve", "pkg", "installed",
+                                  "fixed", "severity"}
 
 
 def test_grype_version_parses_and_fails_soft(mod):
