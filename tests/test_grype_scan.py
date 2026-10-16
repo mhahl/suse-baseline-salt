@@ -102,52 +102,67 @@ def test_summarize_carries_distro(mod):
     assert out["distro"] == {"name": "fedora", "version": "43"}
 
 
-def test_publish_splits_summary_and_detail_keys():
-    sent = {}
+def test_publish_writes_cache_files_and_sends_via_readers(tmp_path):
+    calls = []
 
     def fake_send(name, *args, **kwargs):
-        sent[name] = (args, kwargs)
+        calls.append((name, args, kwargs))
         return True
 
-    mod = load_module(salt={"mine.send": fake_send})
+    mod = load_module(pillar={"cache_dir": str(tmp_path)},
+                      salt={"mine.send": fake_send})
+    finding = {"cve": "CVE-1", "pkg": "p", "installed": "1",
+               "fixed": "", "severity": "HIGH", "namespace": "n",
+               "urls": []}
     mod.scan = lambda *a, **k: {"minion": "web01",  # noqa: E731 -- stub
                                 "scanned_at": "2026-10-16T00:00:00+00:00",
                                 "severity_filter": "HIGH,CRITICAL",
-                                "total": 3, "top": [],
-                                "detailed_report": [{"cve": "CVE-1"}]}
+                                "total": 1, "top": [],
+                                "detailed_report": [finding]}
     assert mod.publish() is True
-    assert mod.MINE_KEY == "grype.scan_summary"
-    assert mod.MINE_DETAIL_KEY == "grype.scan_detail"
-    # Slim summary carries no detailed_report: the fleet-wide key
-    # stays small at thousands of minions.
-    summary = sent["grype.scan_summary"][0][0]
-    assert summary == {"minion": "web01",
-                       "scanned_at": "2026-10-16T00:00:00+00:00",
-                       "severity_filter": "HIGH,CRITICAL",
-                       "total": 3, "top": []}
-    # Full findings ride a separate per-minion key.
-    detail = sent["grype.scan_detail"][0][0]
+    # mine.send takes no inline data: both keys go through reader
+    # functions that serve the files publish just wrote.
+    assert calls == [
+        (mod.MINE_KEY, (), {"mine_function": "grype_scan.cached_summary"}),
+        (mod.MINE_DETAIL_KEY,
+         (), {"mine_function": "grype_scan.cached_detail"}),
+    ]
+    summary = json.loads((tmp_path / "mine-summary.json").read_text())
+    assert summary["total"] == 1
+    assert "detailed_report" not in summary
+    detail = json.loads((tmp_path / "mine-detail.json").read_text())
     assert detail == {"minion": "web01",
                       "scanned_at": "2026-10-16T00:00:00+00:00",
                       "severity_filter": "HIGH,CRITICAL",
-                      "detailed_report": [{"cve": "CVE-1"}]}
+                      "detailed_report": [finding]}
+    assert mod.cached_summary() == summary
+    assert mod.cached_detail() == detail
 
 
-def test_publish_error_refreshes_both_keys_against_stale_detail():
-    sent = {}
+def test_publish_error_refreshes_both_keys_against_stale_detail(tmp_path):
+    calls = []
 
     def fake_send(name, *args, **kwargs):
-        sent[name] = (args, kwargs)
+        calls.append((name, args, kwargs))
         return True
 
-    mod = load_module(salt={"mine.send": fake_send})
+    mod = load_module(pillar={"cache_dir": str(tmp_path)},
+                      salt={"mine.send": fake_send})
     mod.scan = lambda *a, **k: {"minion": "web01",  # noqa: E731 -- stub
                                 "error": "grype exited 1"}
     assert mod.publish() is True
     # A failed scan must not leave yesterday's detail report behind:
     # the error payload lands on both keys.
-    assert sent["grype.scan_summary"][0][0]["error"] == "grype exited 1"
-    assert sent["grype.scan_detail"][0][0]["error"] == "grype exited 1"
+    assert [c[0] for c in calls] == [mod.MINE_KEY, mod.MINE_DETAIL_KEY]
+    for name in ("mine-summary.json", "mine-detail.json"):
+        payload = json.loads((tmp_path / name).read_text())
+        assert payload["error"] == "grype exited 1"
+
+
+def test_cached_readers_empty_before_first_publish(tmp_path):
+    mod = load_module(pillar={"cache_dir": str(tmp_path)})
+    assert mod.cached_summary() == {}
+    assert mod.cached_detail() == {}
 
 
 def test_scan_returns_full_detailed_report(tmp_path):

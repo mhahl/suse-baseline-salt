@@ -4,9 +4,13 @@ Scheduled daily via :func:`publish`, which runs a ``grype dir:/``
 OS/filesystem scan, caches the full JSON report on the minion, and pushes
 two mine keys: a slim summary under ``grype.scan_summary`` (counts,
 ``top`` list, metadata) for fleet-wide readers, and the complete
-findings under ``grype.scan_detail`` for per-minion readers. The mine
-never carries the raw multi-megabyte Grype JSON. All behavior is driven
-by ``baseline:grype`` in ``pillar/baseline.sls``.
+findings under ``grype.scan_detail`` for per-minion readers. Because
+``mine.send`` executes a function rather than taking inline data,
+:func:`publish` runs :func:`scan` once, writes both payloads to cache
+files, and pushes them through the ``cached_summary`` /
+``cached_detail`` reader functions. The mine never carries the raw
+multi-megabyte Grype JSON. All behavior is driven by
+``baseline:grype`` in ``pillar/baseline.sls``.
 
 Overstate notes: both mine keys and the ``grype-cve-scan`` job name are
 stable contracts — the Schedules tab reads them via ``schedule.list``,
@@ -181,6 +185,60 @@ def _summarize(report, severities, top_n):
     }
 
 
+def _cache_path(kind):
+    """Mine cache file for ``kind`` (``summary`` or ``detail``).
+
+    Written by :func:`publish`, served back by the ``cached_*`` reader
+    functions that ``mine.send`` executes. Lives next to the Grype
+    report under ``cache_dir``.
+    """
+    cache_dir = _opt("cache_dir", "/var/cache/grype") or "/var/cache/grype"
+    return _os.path.join(cache_dir, "mine-{}.json".format(kind))
+
+
+def _write_cache_file(path, payload):
+    """Write a mine cache file best-effort, 0640 like the report."""
+    try:
+        parent = _os.path.dirname(path)
+        if parent:
+            _os.makedirs(parent, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            _json.dump(payload, handle)
+        _os.chmod(path, 0o640)
+    except OSError:
+        pass
+
+
+def _read_cache_file(path):
+    """Read a mine cache file; {} when missing or unreadable."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = _json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def cached_summary():
+    """Slim mine summary written by the last :func:`publish`.
+
+    Exists so ``mine.send`` (which only executes functions, never
+    takes inline data) can push precomputed results: the daily
+    schedule sends this under ``grype.scan_summary``. Empty before
+    the first publish.
+    """
+    return _read_cache_file(_cache_path("summary"))
+
+
+def cached_detail():
+    """Full findings written by the last :func:`publish`.
+
+    Sent under ``grype.scan_detail`` the same way. Empty before the
+    first publish.
+    """
+    return _read_cache_file(_cache_path("detail"))
+
+
 def _scan_env(cache_dir, skip_db_update):
     env = dict(_os.environ)
     if cache_dir:
@@ -278,10 +336,11 @@ def scan(severities=None, top_n=None):
 def publish():
     """Run :func:`scan` and push the summary and detail to the mine.
 
-    This is the function the daily schedule calls. Uses ``mine.send``
-    with inline data (not ``mine_function``) so no minion restart is
-    needed. Two keys are written so fleet-wide readers stay cheap at
-    thousands of minions:
+    This is the function the daily schedule calls. ``mine.send``
+    executes a function and stores its return — it never takes inline
+    data — so :func:`scan` runs once here, both payloads are written
+    to cache files, and the two keys go out through the ``cached_*``
+    reader functions:
 
     * ``grype.scan_summary`` — slim summary only (counts, fixable
       total, ``top`` list, distro, scan metadata). No
@@ -293,24 +352,27 @@ def publish():
       readers.
 
     Error results (failed scan) carry no ``detailed_report`` and are
-    sent to both keys, so a failed run never leaves yesterday's
-    detail report behind as a stale success. The raw multi-megabyte
-    Grype JSON stays on the minion at ``report_path`` by design.
+    written to both cache files, so a failed run never leaves
+    yesterday's detail report behind as a stale success. The raw
+    multi-megabyte Grype JSON stays on the minion at ``report_path``
+    by design. Needs no ``mine_functions`` minion config (and no
+    minion restart).
     """
     result = scan()
     mine_send = __salt__["mine.send"]  # noqa: F821
     if isinstance(result.get("detailed_report"), list):
+        summary = {k: v for k, v in result.items() if k != "detailed_report"}
         detail = {
             "minion": result.get("minion", ""),
             "scanned_at": result.get("scanned_at", ""),
             "severity_filter": result.get("severity_filter", ""),
             "detailed_report": result["detailed_report"],
         }
-        summary = {k: v for k, v in result.items() if k != "detailed_report"}
-        return bool(
-            mine_send(MINE_KEY, summary)
-            and mine_send(MINE_DETAIL_KEY, detail)
-        )
+    else:
+        summary = detail = result
+    _write_cache_file(_cache_path("summary"), summary)
+    _write_cache_file(_cache_path("detail"), detail)
     return bool(
-        mine_send(MINE_KEY, result) and mine_send(MINE_DETAIL_KEY, result)
+        mine_send(MINE_KEY, mine_function="grype_scan.cached_summary")
+        and mine_send(MINE_DETAIL_KEY, mine_function="grype_scan.cached_detail")
     )
