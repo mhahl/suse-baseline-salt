@@ -59,3 +59,18 @@ def test_relabel_only_when_selinux_enforced_and_label_wrong():
     assert "resolved_selinux_relabel" not in permissive
 
     assert "restorecon" not in render_init()
+
+
+def test_resolved_conf_template_renders_dot_and_dns():
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(SALT_ROOT)),
+        keep_trailing_newline=True,
+    )
+    tpl = env.get_template("baseline/systemd-resolved/templates/resolved.conf.jinja")
+    default_out = tpl.render(dns={"dns": "1.1.1.1#cloudflare-dns.com"})
+    assert "DNS=1.1.1.1#cloudflare-dns.com" in default_out
+    assert "DNSOverTLS=opportunistic" in default_out
+    assert "DNSSEC=yes" in default_out
+
+    strict_out = tpl.render(dns={"dns": "1.1.1.1", "dns_over_tls": "yes"})
+    assert "DNSOverTLS=yes" in strict_out

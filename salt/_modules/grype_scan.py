@@ -247,6 +247,13 @@ def _scan_env(cache_dir, skip_db_update):
     return env
 
 
+def _is_test_mode():
+    try:
+        return bool(__opts__.get("test"))  # noqa: F821
+    except (AttributeError, NameError):
+        return False
+
+
 def scan(severities=None, top_n=None):
     """Run the Grype filesystem scan, cache the full report, return everything.
 
@@ -266,6 +273,12 @@ def scan(severities=None, top_n=None):
     does not push ~200KB per minion into the shared mine key on every
     run. The raw multi-megabyte Grype JSON stays on the minion.
     """
+    if _is_test_mode():
+        return {
+            "minion": __grains__.get("id", ""),  # noqa: F821
+            "test_mode": True,
+            "comment": "grype scan skipped in test mode",
+        }
     severities = severities or _opt("severities", "HIGH,CRITICAL")
     top_n = _coerce_top_n(_opt("top_n", 20) if top_n is None else top_n)
     cache_dir = _opt("cache_dir", "/var/cache/grype") or ""

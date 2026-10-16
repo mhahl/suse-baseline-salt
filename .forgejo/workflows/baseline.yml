@@ -4,19 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "goss/banner.yaml"
-      - "goss/profile.yaml"
-      - "goss/schedule.yaml"
-      - "goss/systemd-resolved.yaml"
-      - "goss/timesyncd.yaml"
-      - "goss/grype.yaml"
-      - "goss/updates.yaml"
-      - "goss/usb.yaml"
-      - "goss/baseline.yaml"
-      - "goss/freeipa.yaml"
-      - "goss/minion.yaml"
-      - "goss/netbird.yaml"
-      - "goss/goss.yaml"
+      - "goss/**"
       - "salt/baseline/**"
       - "salt/_modules/**"
       - "reactor/**"
@@ -26,24 +14,12 @@ on:
       - "Makefile"
       - "README.md"
       - "scripts/setup-test-vm.sh"
-      - "goss/**"
+      - ".yamllint.yml"
       - ".forgejo/workflows/baseline.yml"
   pull_request:
     branches: [main]
     paths:
-      - "goss/banner.yaml"
-      - "goss/profile.yaml"
-      - "goss/schedule.yaml"
-      - "goss/systemd-resolved.yaml"
-      - "goss/timesyncd.yaml"
-      - "goss/grype.yaml"
-      - "goss/updates.yaml"
-      - "goss/usb.yaml"
-      - "goss/baseline.yaml"
-      - "goss/freeipa.yaml"
-      - "goss/minion.yaml"
-      - "goss/netbird.yaml"
-      - "goss/goss.yaml"
+      - "goss/**"
       - "salt/baseline/**"
       - "salt/_modules/**"
       - "reactor/**"
@@ -53,7 +29,7 @@ on:
       - "Makefile"
       - "README.md"
       - "scripts/setup-test-vm.sh"
-      - "goss/**"
+      - ".yamllint.yml"
       - ".forgejo/workflows/baseline.yml"
 
 jobs:
@@ -99,7 +75,8 @@ jobs:
         run: |
           set -euo pipefail
           GOSS_VERSION="v0.4.9"
-          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64" \
+          GOSS_ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-${GOSS_ARCH}" \
             -o /usr/local/bin/goss
           chmod +x /usr/local/bin/goss
           goss --version
@@ -170,7 +147,8 @@ jobs:
         run: |
           set -euo pipefail
           GOSS_VERSION="v0.4.9"
-          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64" \
+          GOSS_ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+          curl -fsSL "https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-${GOSS_ARCH}" \
             -o /usr/local/bin/goss
           chmod +x /usr/local/bin/goss
           goss --version

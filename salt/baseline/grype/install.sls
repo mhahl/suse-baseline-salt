@@ -9,10 +9,7 @@
 {% set _arch = 'amd64' if grains.get('cpuarch', 'x86_64') == 'x86_64' else 'arm64' if grains.get('cpuarch', '') == 'aarch64' else grains.get('cpuarch', 'amd64') %}
 {% set _ver = grype.version | string %}
 {% set _stripped = _ver[1:] if _ver.startswith('v') else _ver %}
-{% set _hashes = {
-  'amd64': 'sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d',
-  'arm64': 'sha256=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514',
-} %}
+{% set _hashes = grype.hashes %}
 grype_install_dir:
   file.directory:
     - name: /usr/local/bin
@@ -26,7 +23,7 @@ grype_binary:
     - archive_format: tar
     - enforce_toplevel: False
     - overwrite: True
-    - unless: /usr/local/bin/grype version 2>/dev/null | grep -q {{ _stripped }}
+    - unless: /usr/local/bin/grype version 2>/dev/null | grep -Fq {{ _stripped }}
     - require:
       - file: grype_install_dir
 

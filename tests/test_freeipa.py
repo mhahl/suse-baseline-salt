@@ -37,6 +37,7 @@ def test_enabled_adds_repo_and_installs_client():
     assert "- freeipa-client" in rendered
     assert "- fromrepo: security:idm" in rendered
     assert "- pkgrepo: freeipa_obs_repo" in rendered
+    assert "gpgkey: https://download.opensuse.org/repositories/security:/idm/openSUSE_Tumbleweed/repodata/repomd.xml.key" in rendered
     # zypper prompts on new/rotated keys: both states auto-import natively
     assert rendered.count("- gpgautoimport: True") == 2
     assert "rpm --import" not in rendered

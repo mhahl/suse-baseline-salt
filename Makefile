@@ -81,8 +81,10 @@ lint:
 test:
 	python3 -m pytest tests/ -q
 
+GOSS_FILE ?= $(shell if [ -f /etc/os-release ] && grep -q '^ID=fedora' /etc/os-release; then echo goss/fedora.yaml; else echo goss/goss.yaml; fi)
+
 goss: goss-binary
-	$(GOSS) --gossfile goss/goss.yaml validate
+	$(GOSS) --gossfile $(GOSS_FILE) validate
 
 goss-%: goss-binary
 	$(GOSS) --gossfile goss/$*.yaml validate

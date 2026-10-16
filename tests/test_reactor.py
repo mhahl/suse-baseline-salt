@@ -55,6 +55,16 @@ def test_inotify_reapplies_owning_module():
     assert "- baseline.updates" in out
     assert "local_cmd.run:" not in out
 
+    fedora_out = render_reactor("inotify.sls", {
+        "id": "host1", "path": "/etc/dnf/dnf.conf", "change": "modify",
+    })
+    assert "- baseline.updates" in fedora_out
+
+    minion_out = render_reactor("inotify.sls", {
+        "id": "host1", "path": "/etc/salt/minion.d/99-baseline.conf", "change": "modify",
+    })
+    assert "- baseline.minion" in minion_out
+
 
 def test_inotify_audit_logs_watched_non_baseline_paths():
     out = render_reactor("inotify.sls", {
@@ -70,6 +80,11 @@ def test_inotify_audit_logs_unlisted_paths_and_ignores_empty():
     out = render_reactor("inotify.sls", {"id": "host1", "path": "/tmp/noise"})
     assert "local_state.apply:" not in out
     assert "local_cmd.run:" in out
+    injected = render_reactor("inotify.sls", {
+        "id": "host1", "path": "/tmp/bad'$(id)'", "change": "modify",
+    })
+    assert "'" not in injected.split("inotify: ")[1].split(" changed")[0]
+    assert "$" not in injected
     assert render_reactor("inotify.sls", {"id": "host1"}).strip() == ""
 
 
@@ -77,6 +92,7 @@ def test_diskspace_cleans_only_over_threshold():
     over = render_reactor("diskspace.sls", {"id": "host1", "usage": 90})
     assert "journalctl --vacuum-size=500M" in over
     assert "zypper --non-interactive clean --all" in over
+    assert "dnf clean all" in over
     assert "rm -rf /var/cache/grype/db/*" in over
     assert "- tgt: host1" in over
     # report.json (Overstate Mine source of truth) is never removed:

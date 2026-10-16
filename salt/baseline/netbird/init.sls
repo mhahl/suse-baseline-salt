@@ -26,6 +26,7 @@ netbird_repo:
     - baseurl: {{ repo_url }}
     - enabled: True
     - refresh: True
+    - gpgkey: {{ repo_url }}repodata/repomd.xml.key
     - gpgcheck: 1
     - gpgautoimport: True
 {% elif _family == 'RedHat' %}

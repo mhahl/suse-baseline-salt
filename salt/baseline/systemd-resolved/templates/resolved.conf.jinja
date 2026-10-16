@@ -1,14 +1,13 @@
 [Resolve]
 {% if dns.get('dns') %}
-DNS={{dns.dns}}
+DNS={{ dns.dns }}
 {% endif %}
 
 FallbackDNS=
 Domains=~.
-DNSOverTLS=opportunistic
+DNSOverTLS={{ dns.get('dns_over_tls', 'opportunistic') }}
 DNSSEC=yes
 MulticastDNS=no
 LLMNR=no
 Cache=no-negative
 DNSStubListener=yes
-

@@ -69,9 +69,15 @@ def test_install_fetches_pinned_github_release():
 def test_install_honors_version_pin_and_arch():
     rendered = render(
         "baseline/grype/install.sls",
-        pillar={"baseline:grype": {"version": "v0.121.0"}},
+        pillar={
+            "baseline:grype": {
+                "version": "v0.121.0",
+                "hashes": {"amd64": "sha256=custom_amd64_digest"},
+            }
+        },
     )
     assert "grype_0.121.0_linux_amd64.tar.gz" in rendered
+    assert "source_hash: sha256=custom_amd64_digest" in rendered
     arm = render("baseline/grype/install.sls",
                  grains={"os": "Fedora", "os_family": "RedHat",
                          "osrelease": "43", "cpuarch": "aarch64"})

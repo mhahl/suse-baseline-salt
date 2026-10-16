@@ -42,18 +42,19 @@ echo "==> Refreshing package repositories..."
 if [[ "$ID" == "opensuse-tumbleweed" ]]; then
     zypper --non-interactive refresh
     echo "==> Installing required packages..."
-    PACKAGES=(salt-minion make curl git ca-certificates audit cronie firewalld systemd-resolved)
+    PACKAGES=(salt-minion make curl git ca-certificates systemd-resolved python3-pytest python3-Jinja2 yamllint)
     zypper --non-interactive install --no-recommends "${PACKAGES[@]}"
 else
     dnf makecache
     echo "==> Installing required packages..."
-    PACKAGES=(salt-minion make curl git ca-certificates audit cronie firewalld systemd-resolved)
+    PACKAGES=(salt-minion make curl git ca-certificates systemd-resolved python3-pytest python3-jinja2 yamllint)
     dnf install -y "${PACKAGES[@]}"
 fi
 
 # install goss
 GOSS_VERSION="${GOSS_VERSION:-v0.4.9}"
-GOSS_URL="https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64"
+GOSS_ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+GOSS_URL="https://github.com/goss-org/goss/releases/download/${GOSS_VERSION}/goss-linux-${GOSS_ARCH}"
 GOSS_BIN="/usr/local/bin/goss"
 
 if [[ ! -x "$GOSS_BIN" ]]; then

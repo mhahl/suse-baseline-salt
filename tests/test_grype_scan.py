@@ -354,3 +354,13 @@ def test_scan_empty_cache_dir_uses_default_db_env(tmp_path):
         out = mod.scan()
     assert "GRYPE_DB_CACHE_DIR" not in seen["env"]
     assert out["total"] == 0
+
+
+def test_scan_skips_in_test_mode(tmp_path):
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(tmp_path / "report.json")})
+    mod.__opts__ = {"test": True}
+    with mock.patch.object(mod._subprocess, "run") as run_mock:
+        out = mod.scan()
+    assert out["test_mode"] is True
+    assert not run_mock.called

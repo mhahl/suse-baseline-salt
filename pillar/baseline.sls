@@ -1,11 +1,13 @@
 baseline:
   systemd_resolved:
-    # AdGuard resolvers over strict DNS-over-TLS (DNSOverTLS=yes in the
-    # template). The #suffix sets the DoT SNI/auth hostname — equivalent
-    # to kdig's +tls-sni. Port is always 853: systemd-resolved does not
-    # support custom DoT ports. Servers are tried in order; FallbackDNS
-    # stays empty because strict TLS never downgrades anyway.
+    # AdGuard resolvers over DNS-over-TLS (DNSOverTLS=opportunistic by
+    # default, overridable via dns_over_tls: 'yes' or 'opportunistic').
+    # The #suffix sets the DoT SNI/auth hostname — equivalent to kdig's
+    # +tls-sni. Port is always 853: systemd-resolved does not support
+    # custom DoT ports. Servers are tried in order; FallbackDNS stays
+    # empty so resolution never falls back to unconfigured resolvers.
     dns: "51.161.136.107#dns.adguard.sigaint.au 139.99.149.92#dns.adguard.sigaint.au 139.99.210.89#dns.adguard.sigaint.au 139.99.210.170#dns.adguard.sigaint.au"
+    dns_over_tls: "opportunistic"
 
   ntp:
     servers:
@@ -13,7 +15,6 @@ baseline:
       - time2.google.com
       - time3.google.com
       - time4.google.com
-    iburst: true
 
   updates:
     # Uses zypper dup on Tumbleweed and dnf upgrade on Fedora.
@@ -87,9 +88,13 @@ baseline:
   # only: refresh the DB externally (grype db update) or results go
   # stale. Report is stored 0640 (local-only). splay is clamped
   # 0..86400 in schedule.sls; top_n is clamped 0..100 in the module.
-  # version pins the GitHub release (binary to /usr/local/bin/grype).
+  # version pins the GitHub release (binary to /usr/local/bin/grype);
+  # hashes pins the per-arch tarball sha256 digests.
   grype:
     version: 'v0.120.1'   # GitHub release tag, e.g. v0.120.1
+    hashes:
+      amd64: 'sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d'
+      arm64: 'sha256=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514'
     severities: 'HIGH,CRITICAL'
     top_n: 20             # CVEs kept in the mine summary 'top' list (0..100)
     skip_db_update: False # True = offline scans only, manage DB separately

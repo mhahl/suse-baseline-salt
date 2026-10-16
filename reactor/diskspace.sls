@@ -22,7 +22,7 @@ disk_cleanup_zypper:
   local_cmd.run:
     - tgt: {{ data['id'] }}
     - arg:
-      - zypper --non-interactive clean --all
+      - command -v zypper >/dev/null 2>&1 && zypper --non-interactive clean --all || dnf clean all
 disk_cleanup_grype_db:
   local_cmd.run:
     - tgt: {{ data['id'] }}

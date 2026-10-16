@@ -34,6 +34,7 @@ def test_enabled_adds_repo_installs_client_and_runs_service():
     assert "pkgrepo.managed:" in rendered
     assert "- name: netbird" in rendered
     assert "https://pkgs.netbird.io/yum/" in rendered
+    assert "gpgkey: https://pkgs.netbird.io/yum/repodata/repomd.xml.key" in rendered
     # zypper prompts on new/rotated keys: both states auto-import natively
     assert rendered.count("- gpgautoimport: True") == 2
     assert "rpm --import" not in rendered

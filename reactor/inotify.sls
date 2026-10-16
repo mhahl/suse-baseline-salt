@@ -20,9 +20,12 @@
   '/etc/resolv.conf': 'baseline.systemd-resolved',
   '/etc/systemd/timesyncd.conf.d/99-baseline.conf': 'baseline.timesyncd',
   '/etc/zypp/zypp.conf': 'baseline.updates',
+  '/etc/dnf/dnf.conf': 'baseline.updates',
   '/etc/modprobe.d/99-baseline-usb-storage.conf': 'baseline.usb',
   '/etc/profile.d/99-baseline.sh': 'baseline.profile',
   '/etc/motd.d/99-steggy': 'baseline.banner',
+  '/etc/salt/minion.d/99-baseline.conf': 'baseline.minion',
+  '/etc/salt/minion.d/_schedule.conf': 'baseline.schedule',
 } %}
 {% set path = data.get('path', '') %}
 {% if path in healing %}
@@ -33,9 +36,11 @@ reapply_{{ mod | replace('.', '_') | replace('-', '_') }}:
     - arg:
       - {{ mod }}
 {% elif path %}
-audit_{{ path | replace('/', '_') | replace('.', '_') | replace('-', '_') }}:
+{% set safe_path = (path ~ '') | replace("'", "") | replace('"', '') | replace('`', '') | replace('$', '') | replace('\n', ' ') %}
+{% set safe_change = (data.get('change', 'unknown') ~ '') | replace("'", "") | replace('"', '') | replace('`', '') | replace('$', '') | replace('\n', ' ') %}
+audit_{{ safe_path | replace('/', '_') | replace('.', '_') | replace('-', '_') | replace(' ', '_') | replace(';', '_') }}:
   local_cmd.run:
     - tgt: {{ data['id'] }}
     - arg:
-      - "logger -t salt-reactor 'inotify: {{ path }} changed ({{ data.get('change', 'unknown') }})'"
+      - "logger -t salt-reactor 'inotify: {{ safe_path }} changed ({{ safe_change }})'"
 {% endif %}

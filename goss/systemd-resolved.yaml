@@ -10,10 +10,13 @@ file:
     exists: true
     mode: "0644"
     contents:
-      - "DNSOverTLS=yes"
+      - "DNSOverTLS=opportunistic"
       - "DNSSEC=yes"
       - "FallbackDNS="
-      - "DNS=51.161.136.107#dns.adguard.sigaint.au 139.99.149.92#dns.adguard.sigaint.au 139.99.210.89#dns.adguard.sigaint.au 139.99.210.170#dns.adguard.sigaint.au"
+      - "DNS=51.161.136.107#dns.adguard.sigaint.au"
+      - "139.99.149.92#dns.adguard.sigaint.au"
+      - "139.99.210.89#dns.adguard.sigaint.au"
+      - "139.99.210.170#dns.adguard.sigaint.au"
     title: "systemd-resolved uses DNS-over-TLS + DNSSEC"
 
   /etc/resolv.conf:
