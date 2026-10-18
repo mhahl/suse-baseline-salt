@@ -19,4 +19,4 @@
 baseline:
   updates:
     # Uses zypper dup on Tumbleweed and dnf upgrade on Fedora.
-    auto_dup: false
+    auto_dup: true

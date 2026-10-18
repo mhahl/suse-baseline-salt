@@ -10,9 +10,12 @@
 {% if _is_tw or _is_fedora %}
 include:
   - baseline.banner
+  - baseline.firewalld
   - baseline.minion
   - baseline.profile
   - baseline.proxy
+  - baseline.ssh
+  - baseline.sysctl
   - baseline.systemd-resolved
   - baseline.timesyncd
   - baseline.usb

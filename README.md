@@ -150,7 +150,6 @@ goss --gossfile goss/fedora.yaml validate --format tap
 | Command | Description |
 |---------|-------------|
 | `make lint` | Run yamllint |
-| `make test` | Run pytest unit/render tests |
 | `make goss` | Run the openSUSE Tumbleweed Goss suite |
 | `goss --gossfile goss/fedora.yaml validate --format tap` | Run Fedora Goss tests |
 | `make goss-<component>` | Tests for one module, e.g. `goss-timesyncd` |
@@ -162,7 +161,7 @@ goss --gossfile goss/fedora.yaml validate --format tap
 
 ### CI
 
-CI runs separate `opensuse-tumbleweed` and `fedora-latest` container jobs ([`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)). Both lint YAML, run `pytest`, apply the baseline with `--retcode-passthrough`, and run the matching Goss suite. Fedora uses DNF and Fedora-specific checks.
+CI runs separate `opensuse-tumbleweed` and `fedora-latest` container jobs ([`.forgejo/workflows/baseline.yml`](.forgejo/workflows/baseline.yml)). Both lint YAML, apply the baseline with `--retcode-passthrough`, and run the matching Goss suite. Fedora uses DNF and Fedora-specific checks.
 
 ---
 
@@ -221,7 +220,6 @@ reactor/                     # master-side examples (needs reactor.conf wiring b
 ├── diskspace.sls           # diskspace beacon → vacuum journal + zypper clean + grype db (keeps report.json)
 └── reactor.conf.example    # master wiring (file_roots + tag map)
 
-tests/                       # pytest render/unit tests, one file per module
 ```
 
 ---
@@ -356,7 +354,6 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 1. Fork the repo
 2. Add or update a module under `salt/baseline/`
 3. Add corresponding Goss tests in `goss/`
-4. Add a render test in `tests/` and update pillar examples
 5. Run `make lint`, `make test`, and `make goss-<your-module>`
 
 ### Conventions

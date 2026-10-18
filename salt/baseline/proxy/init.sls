@@ -6,8 +6,16 @@
    /etc/dnf/dnf.conf proxy= is RedHat-only. Recurring Salt-run commands
    (updates, grype scan) additionally get per-command env: so they work
    immediately; the minion daemon itself needs one restart after a
-   day-0 proxy change for archive.extracted/pkgrepo downloads. #}
+   day-0 proxy change for archive.extracted/pkgrepo downloads.
+
+   baseline:proxy:enabled (default True) is the master switch. Set it
+   to False to stop managing proxy files entirely: /etc/environment,
+   /etc/sysconfig/proxy and /etc/dnf/dnf.conf are left untouched,
+   stale proxy lines included. Note that baseline.updates and the grype
+   scan still add per-command env: from whatever proxy values are set
+   in pillar — that is independent of this module. #}
 {% set proxy = salt['pillar.get']('baseline:proxy', {}) %}
+{% set enabled = proxy.get('enabled', True) %}
 {% set http_proxy = proxy.get('http_proxy', '') %}
 {% set https_proxy = proxy.get('https_proxy', '') %}
 {% set no_proxy = proxy.get('no_proxy', 'localhost,127.0.0.1,::1') %}
@@ -15,6 +23,7 @@
 {% set _pairs = [('http_proxy', http_proxy), ('https_proxy', https_proxy), ('no_proxy', no_proxy),
                  ('HTTP_PROXY', http_proxy), ('HTTPS_PROXY', https_proxy), ('NO_PROXY', no_proxy)] %}
 
+{% if enabled %}
 proxy_environment_exists:
   file.managed:
     - name: /etc/environment
@@ -26,7 +35,7 @@ proxy_environment_exists:
 
 {% for var, value in _pairs %}
 {% if value %}
-proxy_env_{{ var | lower }}:
+proxy_env_{{ var }}:
   file.keyvalue:
     - name: /etc/environment
     - separator: '='
@@ -36,7 +45,7 @@ proxy_env_{{ var | lower }}:
     - require:
       - file: proxy_environment_exists
 {% else %}
-proxy_env_{{ var | lower }}_absent:
+proxy_env_{{ var }}_absent:
   file.line:
     - name: /etc/environment
     - content: '{{ var }}='
@@ -97,5 +106,6 @@ proxy_dnf_config_absent:
     - pattern: '^proxy=.*'
     - repl: ''
     - onlyif: test -f /etc/dnf/dnf.conf && grep -q '^proxy=' /etc/dnf/dnf.conf
+{% endif %}
 {% endif %}
 {% endif %}

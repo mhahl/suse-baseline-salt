@@ -1,0 +1,64 @@
+# Goss tests for baseline.ssh
+# Verifies the drop-in exists with key hardening settings.
+
+file:
+  /etc/ssh/sshd_config.d/01-baseline-sshd.conf:
+    exists: true
+    mode: "0644"
+    owner: root
+    group: root
+    contents:
+      - "PasswordAuthentication no"
+      - "KbdInteractiveAuthentication no"
+      - "ChallengeResponseAuthentication no"
+      - "GSSAPIAuthentication yes"
+      - "GSSAPIKeyExchange yes"
+      - "AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys"
+      - "PermitRootLogin no"
+      - "MaxAuthTries 3"
+      - "LogLevel VERBOSE"
+      - "Ciphers chacha20-poly1305@openssh.com"
+      - "KexAlgorithms sntrup761x25519-sha512@openssh.com"
+      - "HostKeyAlgorithms ssh-ed25519"
+      - "AllowTcpForwarding no"
+      - "AllowAgentForwarding no"
+      - "X11Forwarding no"
+
+# Verify sshd accepts the config (syntax check)
+command:
+  sshd_config_valid:
+    exec: sshd -t
+    exit-status: 0
+
+  # Verify the resolved runtime values match expectations
+  sshd_runtime_ciphers:
+    exec: sshd -T | grep -E '^ciphers\s'
+    stdout:
+      - chacha20-poly1305
+      - aes256-gcm
+      - aes128-gcm
+
+  sshd_runtime_kex:
+    exec: sshd -T | grep -E '^kexalgorithms\s'
+    stdout:
+      - curve25519-sha256
+
+  sshd_runtime_auth:
+    exec: sshd -T | grep -E '^(passwordauthentication|challengeresponseauthentication|kbdinteractiveauthentication)\s'
+    stdout:
+      - " no$"
+
+  sshd_runtime_permitroot:
+    exec: sshd -T | grep -E '^permitrootlogin\s'
+    stdout:
+      - " no$"
+
+  sshd_runtime_gssapi:
+    exec: sshd -T | grep -E '^gssapiauthentication\s'
+    stdout:
+      - " yes$"
+
+  sshd_runtime_log:
+    exec: sshd -T | grep -E '^loglevel\s'
+    stdout:
+      - " VERBOSE$"

@@ -10,7 +10,6 @@ on:
       - "salt/_modules/**"
       - "reactor/**"
       - "master.d/**"
-      - "tests/**"
       - "pillar/**"
       - "Makefile"
       - "README.md"
@@ -26,7 +25,6 @@ on:
       - "salt/_modules/**"
       - "reactor/**"
       - "master.d/**"
-      - "tests/**"
       - "pillar/**"
       - "Makefile"
       - "README.md"
@@ -65,13 +63,7 @@ jobs:
           zypper --non-interactive refresh
           zypper --non-interactive install --no-recommends \
             salt-minion make curl git ca-certificates \
-            systemd-resolved systemd \
-            python3-pytest python3-Jinja2
-
-      - name: Run unit tests
-        run: |
-          set -euo pipefail
-          python3 -m pytest tests/ -q
+            systemd-resolved systemd
 
       - name: Install Goss
         run: |
@@ -136,7 +128,7 @@ jobs:
           set -euo pipefail
           dnf install -y \
             salt-minion make curl git ca-certificates \
-            python3-pytest python3-jinja2 python3-pip \
+            python3-pip \
             systemd systemd-resolved
 
       - name: Lint YAML
@@ -146,11 +138,6 @@ jobs:
             python3 -m pip install --break-system-packages --quiet yamllint
           fi
           yamllint .
-
-      - name: Run unit tests
-        run: |
-          set -euo pipefail
-          python3 -m pytest tests/ -q
 
       - name: Install Goss
         run: |

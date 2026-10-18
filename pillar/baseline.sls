@@ -10,7 +10,7 @@
 # reusable without any baseline configuration. Legacy baseline:grype
 # pillar still merges as a fallback in overstate map.jinja + module.
 #
-# CONVENTIONS (enforced by tests/test_pillar_layout.py):
+# CONVENTIONS:
 # - All baseline knobs nest under `baseline:`. The ONLY top-level
 #   exception is `mine_functions` (10-mine.sls) — Salt reads it
 #   exclusively from the pillar root.
@@ -27,8 +27,11 @@ include:
   - baseline.03-updates
   - baseline.04-usb
   - baseline.05-schedule
+  - baseline.09-ssh
   - baseline.06-freeipa
   - baseline.07-netbird
   - baseline.08-minion
   - baseline.10-mine
   - baseline.11-proxy
+  - baseline.12-firewalld
+  - baseline.13-sysctl

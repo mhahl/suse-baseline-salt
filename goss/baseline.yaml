@@ -1,10 +1,13 @@
 gossfile:
   banner.yaml: {}
+  firewalld.yaml: {}
   freeipa.yaml: {}
   minion.yaml: {}
   netbird.yaml: {}
   profile.yaml: {}
   schedule.yaml: {}
+  ssh.yaml: {}
+  sysctl.yaml: {}
   systemd-resolved.yaml: {}
   timesyncd.yaml: {}
   updates.yaml: {}

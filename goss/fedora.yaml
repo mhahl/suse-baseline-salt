@@ -1,12 +1,15 @@
 gossfile:
   banner.yaml: {}
-  minion.yaml: {}
-  profile.yaml: {}
-  schedule.yaml: {}
-  systemd-resolved.yaml: {}
-  timesyncd.yaml: {}
-  usb.yaml: {}
-  overstate.yaml: {}
   fedora/freeipa.yaml: {}
   fedora/netbird.yaml: {}
   fedora/updates.yaml: {}
+  firewalld.yaml: {}
+  minion.yaml: {}
+  overstate.yaml: {}
+  profile.yaml: {}
+  schedule.yaml: {}
+  ssh.yaml: {}
+  sysctl.yaml: {}
+  systemd-resolved.yaml: {}
+  timesyncd.yaml: {}
+  usb.yaml: {}

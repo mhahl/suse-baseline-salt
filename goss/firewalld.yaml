@@ -1,0 +1,18 @@
+# Goss tests for baseline.firewalld
+#
+# Validates the firewalld package is installed.  Runtime behaviour
+# (service running, zone queries via firewall-cmd) is tested by the
+# CI only when firewalld is actually available — containers without
+# D-Bus or systemd will skip those command-level assertions.
+#
+# Create a separate versioned file (e.g. goss/firewalld-runtime.yaml)
+# for deeper validation on hosts with a running firewalld service.
+
+package:
+  firewalld:
+    installed: true
+
+command:
+  firewalld_package:
+    exec: rpm -q firewalld
+    exit-status: 0

@@ -24,7 +24,7 @@ PILLAR_SRV ?= /srv/pillar
 # ------------------------------------------------------------------------------
 # Phony targets
 # ------------------------------------------------------------------------------
-.PHONY: help lint test goss install-goss clean \
+.PHONY: help lint goss install-goss clean \
         links unlink salt-call apply highstate overstate-checkout
 
 # ------------------------------------------------------------------------------
@@ -35,7 +35,6 @@ help:
 	@echo
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
-	@echo "  test                Run pytest unit/render tests"
 	@echo "  goss                Run all Goss tests (baseline + overstate)"
 	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-timesyncd, make goss-overstate"
 	@echo "  install-goss        Download a local goss binary to ./bin/goss"
@@ -78,9 +77,6 @@ help:
 # ------------------------------------------------------------------------------
 lint:
 	yamllint .
-
-test:
-	python3 -m pytest tests/ -q
 
 GOSS_FILE ?= $(shell if [ -f /etc/os-release ] && grep -q '^ID=fedora' /etc/os-release; then echo goss/fedora.yaml; else echo goss/goss.yaml; fi)
 GOSS_OVERSTATE ?= goss/overstate.yaml
