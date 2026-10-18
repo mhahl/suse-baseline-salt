@@ -90,11 +90,18 @@ if [[ -d "$REPO_ROOT/salt/baseline" ]]; then
     # baseline/. A traditional minion file_roots of /srv/salt needs this.
     ln -sfn "$REPO_ROOT/salt/_modules" /srv/salt/_modules
 
-    # Symlink pillar files so the repository's pillar/top.sls is used
+    # Symlink pillar files so the repository's pillar/top.sls is used.
+    # pillar/baseline.sls is an aggregator over pillar/baseline/*.sls
+    # (include: baseline.01-*. ..), so the section directory must travel
+    # with it or pillar rendering fails on missing includes.
+    ln -sfn "$REPO_ROOT/salt/overstate" /srv/salt/overstate
     ln -sfn "$REPO_ROOT/pillar/top.sls" /srv/pillar/top.sls
     ln -sfn "$REPO_ROOT/pillar/baseline.sls" /srv/pillar/baseline.sls
+    ln -sfn "$REPO_ROOT/pillar/baseline" /srv/pillar/baseline
+    ln -sfn "$REPO_ROOT/pillar/overstate.sls" /srv/pillar/overstate.sls
+    ln -sfn "$REPO_ROOT/pillar/overstate" /srv/pillar/overstate
 
-    echo "    Symlinked baseline/ and _modules/ into /srv/salt"
+    echo "    Symlinked baseline/, overstate/ and _modules/ into /srv/salt"
     echo "    Symlinked pillar files into /srv/pillar"
 else
     echo "    WARNING: Could not find salt/baseline in repo root."

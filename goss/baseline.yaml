@@ -7,6 +7,5 @@ gossfile:
   schedule.yaml: {}
   systemd-resolved.yaml: {}
   timesyncd.yaml: {}
-  grype.yaml: {}
   updates.yaml: {}
   usb.yaml: {}

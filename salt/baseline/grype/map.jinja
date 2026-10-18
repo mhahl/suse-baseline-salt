@@ -1,13 +1,10 @@
-{# baseline/grype/map.jinja — pillar-overridable defaults.
-   Grype ships no distro package on either platform: install.sls fetches
-   the pinned GitHub release tarball to /usr/local/bin/grype over TLS.
-   Overstate contracts: the grype-cve-scan job name and both mine
-   keys (grype.scan_summary slim + grype.scan_detail full) are stable —
-   do not rename.
-   skip_db_update=True means offline scans only: manage the DB
-   externally (grype db update) or results go stale.
-   schedule_splay is clamped 0..86400 in schedule.sls (default 600).
-   top_n is clamped 0..100 in grype_scan.py (default 20). #}
+{# baseline/grype/map.jinja — DEPRECATED, canonical is overstate/grype/map.jinja.
+   Kept as a full copy (not an import shim: Jinja does not re-export
+   `{% from ... import %}` names across two hops, so a chained import
+   would break `{% from "baseline/grype/map.jinja" import grype %}`).
+   Merges legacy baseline:grype first, overstate:grype wins — identical
+   to overstate/grype/map.jinja. New code must import from
+   "overstate/grype/map.jinja". #}
 {% set _default_hashes = {
   'amd64': 'sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d',
   'arm64': 'sha256=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514',
@@ -22,11 +19,16 @@
   'report_path': '/var/cache/grype/report.json',
   'run_initial_scan': True,
   'schedule_splay': 600,
+  'nice_level': 19,
 } %}
-{% set _pillar_grype = salt['pillar.get']('baseline:grype', {}) %}
-{% do grype.update(_pillar_grype) %}
+{% set _over = salt['pillar.get']('overstate:grype', {}) %}
+{% set _legacy = salt['pillar.get']('baseline:grype', {}) %}
+{% set _merged_pillar = {} %}
+{% do _merged_pillar.update(_legacy) %}
+{% do _merged_pillar.update(_over) %}
+{% do grype.update(_merged_pillar) %}
 {% set _merged_hashes = dict(_default_hashes) %}
-{% if _pillar_grype.get('hashes') is mapping %}
-{% do _merged_hashes.update(_pillar_grype.get('hashes')) %}
+{% if _merged_pillar.get('hashes') is mapping %}
+{% do _merged_hashes.update(_merged_pillar.get('hashes')) %}
 {% endif %}
 {% do grype.update({'hashes': _merged_hashes}) %}

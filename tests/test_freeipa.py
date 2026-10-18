@@ -1,10 +1,13 @@
 """Render tests for the openSUSE and Fedora FreeIPA client branches.
 
 Tumbleweed adds the OBS repo; Fedora uses its base repo. Both install the
-FreeIPA client package only — no domain enrollment. Disabling on Tumbleweed
-removes the repo but keeps already-installed packages, mirroring how the
-croniter providers stay installed in baseline.schedule's disabled
-branches.
+FreeIPA client package by default (install-only). Domain join via
+ipa-client-install is opt-in through join.enabled + domain/principal/
+password (encrypted pillar): secrets go via env with hide_output, the
+join is skipped when /etc/ipa/default.conf exists, and --no-ntp keeps
+timesyncd the sole NTP client. Disabling on Tumbleweed removes the repo
+but keeps already-installed packages, mirroring how the croniter
+providers stay installed in baseline.schedule's disabled branches.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -71,3 +74,54 @@ def test_fedora_installs_client_without_obs_repo_or_zypper_options():
     assert "pkgrepo.absent:" not in rendered
     assert "fromrepo:" not in rendered
     assert "gpgautoimport:" not in rendered
+
+
+def test_join_disabled_by_default():
+    rendered = render_freeipa({})
+    assert "freeipa_join:" not in rendered
+    assert "IPA_JOIN_PASSWORD" not in rendered
+
+
+def test_join_enabled_renders_idempotent_secret_free_command():
+    rendered = render_freeipa({"join": {
+        "enabled": True, "domain": "example.com",
+        "principal": "svc-enroll", "password": "s3cret",
+    }})
+    assert "freeipa_join:" in rendered
+    assert "cmd.run:" in rendered
+    assert "--domain=example.com" in rendered
+    assert "--realm=EXAMPLE.COM" in rendered
+    assert "--principal=svc-enroll" in rendered
+    # Secret via env, never inline in the state name.
+    assert "- IPA_JOIN_PASSWORD: s3cret" in rendered
+    assert '--password="$IPA_JOIN_PASSWORD"' in rendered
+    assert "--password=s3cret" not in rendered
+    assert "--password s3cret" not in rendered
+    assert "--mkhomedir" in rendered
+    assert "--no-ntp" in rendered
+    assert "hide_output: True" in rendered
+    assert "output_loglevel: quiet" in rendered
+    assert "unless: test -f /etc/ipa/default.conf" in rendered
+    assert "- pkg: freeipa_client" in rendered
+
+
+def test_join_optional_server_realm_flags():
+    rendered = render_freeipa({"join": {
+        "enabled": True, "domain": "example.com", "realm": "EXAMPLE.ORG",
+        "server": "ipa.example.com", "principal": "svc", "password": "p",
+        "mkhomedir": False, "no_ntp": False, "extra_args": "--no-ssh",
+    }})
+    assert "--realm=EXAMPLE.ORG" in rendered
+    assert "--server=ipa.example.com" in rendered
+    assert "--no-mkhomedir" in rendered
+    assert "--no-ntp" not in rendered
+    assert "--no-ssh" in rendered
+
+
+def test_join_missing_creds_fails_closed():
+    for join in ({"enabled": True}, {"enabled": True, "domain": "example.com"},
+                 {"enabled": True, "domain": "example.com", "principal": "svc"}):
+        rendered = render_freeipa({"join": join})
+        assert "test.fail_without_changes:" in rendered
+        assert "domain, principal and password" in rendered
+        assert "freeipa_join:" not in rendered

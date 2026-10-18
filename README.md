@@ -1,6 +1,6 @@
 # SUSE Baseline
 
-> SaltStack states + pillar for a focused security/forensics baseline on **openSUSE Tumbleweed and Fedora**. `baseline/init.sls` fails fast on unsupported OS grains.
+> SaltStack states + pillar: a focused security/forensics `baseline` on **openSUSE Tumbleweed and Fedora** (fails fast on unsupported grains) plus a decoupled `overstate` namespace (fleet visibility — Grype CVE scanning to the Salt Mine) reusable with zero baseline configuration.
 
 [![Salt](https://img.shields.io/badge/Salt-3006%2B-blue)](https://saltproject.io/)
 [![openSUSE](https://img.shields.io/badge/openSUSE-Tumbleweed-green)](https://www.opensuse.org/)
@@ -15,27 +15,33 @@
 | Category | Modules |
 |----------|---------|
 | **Supported OS** | openSUSE Tumbleweed, Fedora |
-| **System** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `grype`, `freeipa`, `netbird`, `minion` |
+| **System (baseline)** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `freeipa`, `netbird`, `minion` |
+| **Visibility (overstate)** | `grype` (install + scan + daily schedule + clean, mine keys `grype.scan_summary`/`grype.scan_detail`) |
 | **Hardening** | `usb` |
 
 - **Forensic-ready** bash history and session controls
 - **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP via systemd-timesyncd — the only NTP client here)
 - **Modern security controls** (USB storage blocking)
-- **Vulnerability scanning** — daily Grype filesystem scans with summaries published to the Salt Mine (`grype.scan_summary`)
-- **Identity and mesh VPN clients** — FreeIPA from OBS on Tumbleweed or Fedora base repositories, and NetBird from its official repo (clients only; enrollment/join stays manual)
+- **Vulnerability scanning (overstate)** — daily Grype filesystem scans with summaries published to the Salt Mine (`grype.scan_summary` slim + `grype.scan_detail` full), no baseline required
+- **Identity and mesh VPN clients** — FreeIPA from OBS on Tumbleweed or Fedora base repositories, and NetBird from its official repo (install + opt-in auto-join via pillar)
 - **Overstate-ready scheduling** — hourly mine updates, nightly highstate, and daily jobs, visible in Overstate's Schedules tab
-- **Pillar-driven** — DNS, NTP, USB, schedule, grype, freeipa, netbird, and update behavior are configurable via pillar
+- **Pillar-driven** — DNS, NTP, USB, schedule, freeipa (incl. `join`), netbird (incl. `join`), update behavior via `baseline.*`; Grype tuning via `overstate:grype` (legacy `baseline:grype` still merges as fallback)
 
 ---
 
 ## 🚀 Quick Start
 
 ```bash
-# Apply the full baseline (openSUSE Tumbleweed or Fedora)
-salt '*' state.apply baseline
+# Full fleet (highstate composes both via salt/top.sls)
+salt '*' state.highstate
+
+# Or target namespaces independently:
+salt '*' state.apply baseline          # OS hardening only (no grype)
+salt '*' state.apply overstate         # fleet visibility only (grype)
+salt '*' state.apply overstate.grype   # standalone CVE scanning, zero baseline config
 ```
 
-Or include it via your top file / highstate.
+Or include them via your top file / highstate.
 
 ---
 
@@ -44,19 +50,78 @@ Or include it via your top file / highstate.
 All configuration lives in pillar:
 
 ```yaml
-# pillar/top.sls
+# pillar/top.sls (defaults; per-fleet secrets appended after — later wins)
 base:
   '*':
     - baseline
+    - overstate
 ```
 
-See [`pillar/baseline.sls`](pillar/baseline.sls) for every knob (`baseline.*` settings plus top-level `mine_functions` for the Salt Mine). Notable defaults:
+See [`pillar/baseline.sls`](pillar/baseline.sls) (aggregator over [`pillar/baseline/`](pillar/baseline/)) and [`pillar/overstate.sls`](pillar/overstate.sls) (aggregator over [`pillar/overstate/`](pillar/overstate/)) for every knob. Each section file carries a banner with WHY it exists, which state consumes it, and a copy-pastable override EXAMPLE. `pillar/top.sls` serves both (`- baseline`, `- overstate`) so highstate preserves full-fleet behavior while each namespace stays independently applicable. Notable defaults:
 
 - `baseline:usb:block_storage: true` — USB storage blocked
 - `baseline:updates:auto_dup: false` — no upgrade runs unless opted in (`zypper dup` on Tumbleweed, `dnf upgrade --refresh` on Fedora)
-- `baseline:freeipa:enabled: true` — OBS `security:idm` repo on Tumbleweed; Fedora base repo; no enrollment
-- `baseline:netbird:enabled: true` — official NetBird repo + daemon, no network join; repo signing is configured per package manager
+- `baseline:freeipa:enabled: true` — OBS `security:idm` repo on Tumbleweed; Fedora base repo; install-only unless `join.enabled` with `domain`/`principal`/`password` (encrypted pillar)
+- `baseline:netbird:enabled: true` — official NetBird repo + daemon; opt-in join via `join.enabled` + `setup_key` (encrypted pillar); repo signing is configured per package manager
 - `baseline:minion:masters` — minion's master IPs with native failover (default `['salt']`; minion restarts on change)
+- `overstate:grype:version` + `hashes` — pinned GitHub release + per-arch sha256 (supply-chain control; refresh both from `checksums.txt` on bump)
+- `overstate:grype:nice_level: 19` — daily scans at lowest CPU priority + idle I/O (never starve workloads)
+- `baseline:proxy:http_proxy/https_proxy/no_proxy` — egress proxy (empty = direct); covers zypper/dnf upgrades, Grype DB/scan, `/etc/environment` + native tool config
+
+---
+
+## 🔐 Secrets (encrypted pillar)
+
+`overstate:grype` needs no secrets (version, hashes, severities are public). Encrypt these instead:
+
+| Secret | Pillar key | Notes |
+|---|---|---|
+| IPA svc-account password | `baseline:freeipa:join:password` | Long-lived credential; prefer per-host OTPs where possible |
+| NetBird setup key | `baseline:netbird:join:setup_key` | Reusable until expiry/revocation; set reuse limits + rotation runbook |
+| Proxy credentials (if any) | `baseline:proxy:http_proxy` as `http://user:pass@proxy:8080` | Only when the proxy itself needs auth |
+
+The repo ships empty-string placeholders; real values live in an encrypted overlay that wins by merge order. Ciphertext is safe to commit — the private key is not.
+
+### 1. One-time master setup
+
+```bash
+sudo -u salt gpg --homedir /etc/salt/gpgkeys --gen-key  # no passphrase: unattended master
+# copy master.d/gpg.conf.example to /etc/salt/master.d/gpg.conf, then:
+sudo -u salt gpg --homedir /etc/salt/gpgkeys --import private.key
+sudo -u salt gpg --homedir /etc/salt/gpgkeys --import-ownertrust  # mark ultimately trusted (6)
+systemctl reload salt-master  # Overstate prod: restart the salt-master container
+```
+
+`/etc/salt/gpgkeys` must be a persistent volume (mode `0700`, master-user owned) **outside** the Overstate bind mount — Sync now syncs the repo checkout only.
+
+### 2. Add the overlay
+
+```bash
+cp pillar/secrets/prod.sls.example pillar/secrets/prod.sls
+echo -n 's3cret' | gpg --encrypt --armor -r <master-key-id>  # paste output over each PASTE-* block
+```
+
+```yaml
+# pillar/top.sls — uncomment the targeting (later entries win in pillar merge):
+  'salt-prod-*':
+    - secrets.prod
+```
+
+### 3. Verify without leaking
+
+```bash
+salt 'one-minion' saltutil.refresh_pillar
+salt 'one-minion' pillar.get baseline:freeipa:join       # targeted get only
+salt '*' state.apply baseline.freeipa test=True          # dry-run before enforcing
+```
+
+Never run `pillar.items` in shared terminals or Overstate Jobs — returns are visible. The join states already pass secrets via `env:` with `hide_output` + quiet logs.
+
+### 4. Rotate
+
+Re-encrypt the new value into `pillar/secrets/prod.sls`, highstate, then revoke server-side (NetBird dashboard key expiry; IPA password reset / `user-disable`). Re-joining IPA needs manual `ipa-client-install --uninstall` first. CI needs no GPG key: defaults keep both joins disabled with empty secrets, and CI never targets `secrets.*`.
+
+> Enterprise end-state is Vault (`ext_pillar`), not GPG — dynamic leases, audit, rotation. Same overlay pattern applies; GPG is the zero-infra start.
 
 ---
 
@@ -106,26 +171,49 @@ CI runs separate `opensuse-tumbleweed` and `fedora-latest` container jobs ([`.fo
 ```
 salt/
 ├── _modules/               # custom execution modules (synced automatically)
-│   └── grype_scan.py       # scan/publish for the grype module
-└── baseline/               # Salt modules plus shared and family includes
-    ├── init.sls            # grain guard + shared module includes
+│   └── grype_scan.py       # scan/publish for overstate.grype (reads overstate:grype, fallback baseline:grype)
+├── overstate/              # decoupled fleet-visibility namespace (no baseline required)
+│   ├── init.sls            # includes overstate.grype
+│   └── grype/              # install + scan + daily schedule + clean + map.jinja
+└── baseline/               # your custom OS hardening plus shared and family includes
+    ├── init.sls            # grain guard + shared module includes (no grype)
     ├── redhat/             # Fedora group includes freeipa, netbird, schedule, updates
     ├── suse/               # Tumbleweed group includes freeipa, netbird, schedule, updates
     ├── banner/
-    ├── freeipa/            # OBS repo on Tumbleweed; Fedora base package (no enroll)
+    ├── freeipa/            # OBS repo on Tumbleweed; Fedora base package + opt-in ipa-client-install join
+    ├── grype/              # DEPRECATED shim -> overstate.grype (one release)
     ├── minion/             # minion master address: IP, not DNS
-    ├── netbird/            # official NetBird repo + daemon (no join)
+    ├── netbird/            # official NetBird repo + daemon + opt-in `netbird up` join
     ├── profile/
+    ├── proxy/              # egress proxy env + native tool config
     ├── schedule/           # mine-update-hourly, highstate-nightly, sync-modules-daily
     ├── systemd-resolved/   # DoT resolvers + stub symlink + netconfig guard
     ├── timesyncd/          # NTP via systemd-timesyncd
-    ├── grype/              # install + scan + daily schedule + clean
     ├── updates/            # zypp on Tumbleweed; minimal DNF config + optional upgrade on Fedora
     └── usb/                # USB mass-storage blacklist
 
 pillar/
-├── baseline.sls            # baseline.* settings + top-level mine_functions
-└── top.sls
+├── baseline.sls            # aggregator over baseline/*.sls
+├── overstate.sls           # aggregator over overstate/*.sls (overstate:grype)
+├── secrets/                # encrypted overlays (ciphertext committable; see Secrets below)
+│   └── prod.sls.example    # template — copy to prod.sls, paste gpg ciphertext (never loaded as .example)
+├── baseline/               # one file per concern, each with WHY + consumer + EXAMPLE
+│   ├── 01-systemd-resolved.sls  # baseline:systemd_resolved (DoT resolvers)
+│   ├── 02-ntp.sls               # baseline:ntp (timesyncd servers)
+│   ├── 03-updates.sls           # baseline:updates (auto_dup opt-in)
+│   ├── 04-usb.sls               # baseline:usb (block_storage)
+│   ├── 05-schedule.sls          # baseline:schedule (mine/highstate/sync jobs)
+│   ├── 06-freeipa.sls           # baseline:freeipa (+ opt-in join)
+│   ├── 07-netbird.sls           # baseline:netbird (+ opt-in join)
+│   ├── 08-minion.sls            # baseline:minion (master IPs + failover)
+│   ├── 11-proxy.sls             # baseline:proxy (egress http_proxy/https_proxy/no_proxy)
+│   └── 10-mine.sls              # mine_functions (TOP LEVEL — Salt only reads root)
+├── overstate/              # decoupled visibility pillar
+│   └── 01-grype.sls             # overstate:grype (version/hashes/scan tuning)
+└── top.sls                 # serves `- baseline` + `- overstate` (+ targeted secrets.* overlays)
+
+master.d/                    # master-side configs (copy to /etc/salt/master.d/, never applied from repo)
+└── gpg.conf.example        # GPG keydir for encrypted pillar (see Secrets below)
 
 reactor/                     # master-side examples (needs reactor.conf wiring below)
 ├── service.sls             # service beacon → restart resolved/timesyncd
@@ -160,6 +248,10 @@ zypper lr netbird && rpm -q netbird && systemctl is-active netbird
 rpm -q freeipa-client
 dnf repolist netbird && rpm -q netbird && systemctl is-active netbird
 
+# Opt-in joins (only when join.enabled in pillar)
+netbird status                          # Connected when joined
+test -f /etc/ipa/default.conf && klist  # enrolled when joined
+
 # Update configuration
 test -f /etc/zypp/zypp.conf  # openSUSE Tumbleweed
 test -f /etc/dnf/dnf.conf   # Fedora
@@ -172,7 +264,8 @@ cat /etc/salt/minion.d/_schedule.conf
 salt-call schedule.list
 salt-call mine.update && salt-call mine.get '*' grains.items
 
-# Vulnerability scanning (report is 0640, summary + detail go to mine)
+# Vulnerability scanning via overstate.grype (report is 0640, summary + detail go to mine)
+salt '*' state.apply overstate.grype
 ls -l /var/cache/grype/report.json
 python3 -m json.tool /var/cache/grype/report.json >/dev/null
 salt-call grype_scan.scan | head -60          # full result, split by publish()
@@ -214,12 +307,12 @@ Overstate ships file roots only — add pillar roots on the master (`/etc/salt/m
 
 1. Install the minion, point it at the master, and **accept the key by fingerprint** (`auto_accept` stays off outside dev).
 2. Jobs → new job → target `*` → function `state.apply` → args `baseline`. Dry-run first with `test=True`.
-3. Minion detail → **Mine** tab shows grains/addresses after the first push, plus `grype.scan_summary` after the first scan; the **Vulns** tab shows the full `grype.scan_detail` report; the **Schedules** tab shows `mine-update-hourly`, `highstate-nightly`, `sync-modules-daily`, and `grype-cve-scan`.
+3. Minion detail → **Mine** tab shows grains/addresses after the first push, plus `grype.scan_summary` after the first `overstate.grype` scan; the **Vulns** tab shows the full `grype.scan_detail` report; the **Schedules** tab shows `mine-update-hourly`, `highstate-nightly`, `sync-modules-daily` (baseline) and `grype-cve-scan` (overstate). Standalone customers: Jobs → `state.apply` → args `overstate.grype` with zero baseline config.
 
 ### 5. What runs itself afterwards
 
 - **Hourly**: `mine-update-hourly` runs `mine.update`, refreshing the Mine data Overstate browses (grains/addresses from `mine_functions`).
-- **Nightly**: `highstate-nightly` runs `state.highstate` at `02:17` (splayed, so the fleet doesn't stampede the master).
+- **Nightly**: `highstate-nightly` runs `state.highstate` at `02:17` (splayed, so the fleet doesn't stampede the master) — highstate composes `baseline` + `overstate` via `salt/top.sls`.
 - **Daily**: `sync-modules-daily` syncs custom execution modules, and `grype-cve-scan` updates the vulnerability DB, re-scans, and pushes via `mine.send` under two stable keys — slim `grype.scan_summary` (`counts`, `total`, `fixable`, `top`, `distro`, versions, `scanned_at`) for fleet-wide readers plus complete `grype.scan_detail` (every finding with namespace/urls) for per-minion readers. The raw multi-megabyte Grype JSON stays on the minion at `report_path`. Error results land on both keys so a failed scan never leaves a stale detail report behind.
 - Both grype mine keys are **not** part of `mine_functions` (no restart needed) and are **not** refreshed by `mine.update`: a missed daily run leaves stale/missing entries until the next success. `skip_db_update: True` means offline scans only — refresh the DB externally (`grype db update`) or results go stale.
 - Tune or disable any of them in pillar under `baseline:schedule`; disabling a job removes it from the minion instead of leaving a stale schedule behind. `baseline:grype:schedule_splay` is clamped 0..86400 (default 600); `top_n` is clamped 0..100 (default 20) so the Mine payload stays small.
@@ -240,12 +333,14 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ## ⚠️ Important Notes
 
+- **Grype migration (`baseline.grype` → `overstate.grype`):** `state.apply baseline` no longer pulls scanning; highstate still does both (`salt/top.sls`: `- baseline`, `- overstate`). Move pillar verbatim `baseline:{grype:{...}}` → `overstate:{grype:{...}}` (legacy key still merges as fallback, overstate wins). `state.apply baseline.grype` still works for one release via deprecated shim. Goss: `make goss` now validates baseline/fedora **plus** `goss/overstate.yaml`; CI applies `baseline` then `overstate` and validates both suites.
+
 - **Supported platforms:** openSUSE Tumbleweed and Fedora. The guard keeps the existing Tumbleweed grain variants and admits Fedora only for `os_family=RedHat` and `os=Fedora`; other platforms fail fast.
 - **USB storage** is blocked by default (set `baseline:usb:block_storage: false` to allow it — that removes a previously deployed blacklist file).
 - **Automatic upgrades are disabled by default** — set `baseline:updates:auto_dup: true` to enable `zypper dup` on Tumbleweed or `dnf upgrade --refresh` on Fedora.
 - **Package-manager behavior branches by family:** FreeIPA uses OBS on Tumbleweed and Fedora's base repositories; NetBird signing configuration differs between zypper and DNF.
 - **No SSH hardening** is included (assumed to be handled by FreeIPA).
-- **No network joins.** FreeIPA enrollment (`ipa-client-install`) and NetBird join (`netbird up`) stay manual — both need credentials this baseline will not carry.
+- **Auto-join is opt-in and secret-safe.** `baseline:freeipa:join.enabled` needs `domain`/`principal`/`password`; `baseline:netbird:join.enabled` needs `setup_key`. Store both secrets in encrypted pillar (GPG/sops/Vault), never plaintext — states pass them via `env` with `hide_output` + quiet logs so they never appear in state names or Overstate job output. Joins are idempotent (FreeIPA skips when `/etc/ipa/default.conf` exists; NetBird skips when `status` reports connected); re-joining IPA requires manual `ipa-client-install --uninstall` first.
 
 ---
 

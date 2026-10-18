@@ -1,7 +1,9 @@
 """Render tests for the openSUSE Tumbleweed and Fedora baseline guard.
 
 The guard preserves the existing Tumbleweed grain variants and adds
-Fedora only when os_family is RedHat and os is Fedora.
+Fedora only when os_family is RedHat and os is Fedora. Grype lives in
+the decoupled overstate namespace (reusable without baseline) — baseline
+no longer includes it; highstate composes both via salt/top.sls.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -37,8 +39,8 @@ TW_SUSE_FULLNAME = {"os": "SUSE", "os_family": "Suse",
                     "osfullname": "openSUSE Tumbleweed",
                     "osmajorrelease": 20260922, "osrelease": "20260922"}
 
-COMMON_MODULES = ("banner", "minion", "profile", "systemd-resolved",
-                  "timesyncd", "grype", "usb")
+COMMON_MODULES = ("banner", "minion", "profile", "proxy", "systemd-resolved",
+                  "timesyncd", "usb")
 
 
 def render_init(grains):
@@ -56,6 +58,7 @@ def test_tumbleweed_includes_common_modules_and_suse_group():
     assert "test.fail_without_changes" not in rendered
     for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.grype" not in rendered
     assert "- baseline.suse" in rendered
     assert "- baseline.redhat" not in rendered
 
@@ -81,6 +84,7 @@ def test_suse_with_rolling_date_is_admitted():
     assert "test.fail_without_changes" not in rendered
     for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.grype" not in rendered
     assert "- baseline.suse" in rendered
     assert "- baseline.redhat" not in rendered
 
@@ -90,6 +94,7 @@ def test_fedora_includes_common_modules_and_redhat_group():
     assert "test.fail_without_changes" not in rendered
     for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.grype" not in rendered
     assert "- baseline.redhat" in rendered
     assert "- baseline.suse" not in rendered
 
@@ -99,8 +104,21 @@ def test_suse_grain_with_tumbleweed_fullname_is_admitted():
     assert "test.fail_without_changes" not in rendered
     for module in COMMON_MODULES:
         assert f"- baseline.{module}" in rendered
+    assert "- baseline.grype" not in rendered
     assert "- baseline.suse" in rendered
     assert "- baseline.redhat" not in rendered
+
+
+def test_overstate_namespace_owns_grype():
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(SALT_ROOT)))
+    rendered = env.get_template("overstate/init.sls").render()
+    assert "- overstate.grype" in rendered
+
+
+def test_baseline_grype_shim_still_includes_overstate():
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(SALT_ROOT)))
+    rendered = env.get_template("baseline/grype/init.sls").render()
+    assert "- overstate.grype" in rendered
 
 
 def test_other_os_fails_fast_with_grains_in_message():

@@ -21,7 +21,8 @@ def load_module(pillar=None, grains=None, salt=None):
     spec = importlib.util.spec_from_file_location("grype_scan", MOD_PATH)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    mod.__pillar__ = {"baseline": {"grype": pillar or {}}}
+    mod.__pillar__ = {"overstate": {"grype": pillar or {}},
+                     "baseline": {"grype": {}}}
     mod.__grains__ = {"id": "web01", **(grains or {})}
     if salt is not None:
         mod.__salt__ = salt
@@ -298,7 +299,7 @@ def test_scan_missing_binary_names_the_fix(tmp_path):
     mod._grype_bin = lambda: "/nonexistent/grype"  # noqa: E731 -- no binary
     out = mod.scan()
     assert out["minion"] == "web01"
-    assert "baseline.grype" in out["error"]
+    assert "overstate.grype" in out["error"]
     assert "grype" in out["error"]
 
 
@@ -364,3 +365,65 @@ def test_scan_skips_in_test_mode(tmp_path):
         out = mod.scan()
     assert out["test_mode"] is True
     assert not run_mock.called
+def test_opt_prefers_overstate_with_baseline_fallback():
+    mod = load_module(pillar={"severities": "CRITICAL"})
+    assert mod._opt("severities") == "CRITICAL"
+    mod.__pillar__ = {"baseline": {"grype": {"severities": "LOW"}}}
+    assert mod._opt("severities") == "LOW"
+    mod.__pillar__ = {"overstate": {"grype": {"severities": "MEDIUM"}},
+                      "baseline": {"grype": {"severities": "LOW"}}}
+    assert mod._opt("severities") == "MEDIUM"
+def test_coerce_nice_level_clamps_lowest_priority(mod):
+    assert mod._coerce_nice_level(19) == 19
+    assert mod._coerce_nice_level(0) == 0
+    assert mod._coerce_nice_level(999) == 19
+    assert mod._coerce_nice_level(-5) == 0
+    assert mod._coerce_nice_level("bad") == 19
+    assert mod._coerce_nice_level(None) == 19
+
+
+def test_proxy_opts_exports_only_set_values():
+    mod = load_module(pillar={})
+    mod.__pillar__ = {"baseline": {"proxy": {
+        "http_proxy": "http://proxy:8080", "https_proxy": "", "no_proxy": "localhost"}}}
+    assert mod._proxy_opts() == {"http_proxy": "http://proxy:8080",
+                                 "no_proxy": "localhost"}
+    mod.__pillar__ = {"baseline": {}}
+    assert mod._proxy_opts() == {}
+
+
+def test_scan_runs_niced_with_proxy_and_idle_io(tmp_path):
+    import json as _json
+    report_file = tmp_path / "report.json"
+    report_file.write_text(_json.dumps({"matches": []}), encoding="utf-8")
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        if cmd[1:2] in (["version"], ["db"]):
+            import unittest.mock as _mock
+            return _mock.Mock(returncode=0, stdout="{}", stderr="")
+        seen["cmd"] = cmd
+        seen["env"] = kwargs.get("env", {})
+        seen["preexec"] = kwargs.get("preexec_fn")
+        import unittest.mock as _mock
+        return _mock.Mock(returncode=0, stdout="", stderr="")
+
+    mod = load_module(pillar={"cache_dir": str(tmp_path),
+                              "report_path": str(report_file)})
+    mod.__pillar__ = {"overstate": {"grype": {"cache_dir": str(tmp_path),
+                                              "report_path": str(report_file)}},
+                      "baseline": {"proxy": {"http_proxy": "http://proxy:8080"}}}
+    mod._grype_bin = lambda: "/usr/local/bin/grype"  # noqa: E731 -- stub
+    import unittest.mock as mock
+    with mock.patch.object(mod._subprocess, "run", side_effect=fake_run):
+        with mock.patch.object(mod._os.path, "exists", return_value=True):
+            out = mod.scan()
+    assert out["total"] == 0
+    # Lowest CPU priority via preexec_fn (no external nice dependency).
+    assert callable(seen["preexec"])
+    # Idle I/O class prefixes the command when ionice exists.
+    assert seen["cmd"][:2] == ["/usr/bin/ionice", "-c3"]
+    assert seen["cmd"][2] == "/usr/local/bin/grype"
+    # Proxy exported in both cases for disagreeing tooling.
+    assert seen["env"]["http_proxy"] == "http://proxy:8080"
+    assert seen["env"]["HTTP_PROXY"] == "http://proxy:8080"

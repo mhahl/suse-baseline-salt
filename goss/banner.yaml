@@ -1,4 +1,5 @@
-# Goss tests for baseline.banner
+# Goss tests for baseline.banner (dino art is lab culture; the legal
+# notice below it is mandatory and must never be removed)
 
 file:
   /etc/motd.d/99-steggy:
@@ -8,4 +9,7 @@ file:
     contents:
       - "It's a UNIX System!"
       - "I know this!"
-    title: "motd banner is installed"
+      - "Authorised users only."
+      - "All activity may be monitored and recorded."
+      - "Unauthorised use is prohibited"
+    title: "motd banner is installed with legal notice"

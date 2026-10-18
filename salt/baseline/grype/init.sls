@@ -1,16 +1,7 @@
-# baseline.grype/init.sls — Grype CVE scanning: install, scan, daily schedule.
-# Apply with: salt '*' state.apply baseline.grype
-# (also included in the full baseline).
-# Mine keys for the dashboard: grype.scan_summary (slim) +
-# grype.scan_detail (full findings) — see README.md.
-
-grype_sync_modules:
-  module.run:
-    - name: saltutil.sync_modules
-    - reload_modules: True
-    - order: 1
-
+# baseline.grype/init.sls — DEPRECATED shim over overstate.grype.
+# Grype moved to the overstate namespace (reusable without baseline).
+# baseline/init.sls no longer includes it. Apply overstate.grype instead;
+# this wrapper remains for one release so `state.apply baseline.grype`
+# keeps working.
 include:
-  - baseline.grype.install
-  - baseline.grype.scan
-  - baseline.grype.schedule
+  - overstate.grype

@@ -1,9 +1,10 @@
-"""Render tests for baseline.grype.
+"""Render tests for overstate.grype (decoupled from baseline).
 
 Grype ships as a pinned GitHub release tarball to /usr/local/bin/grype
 (no distro package on either platform). The install extracts the
 versioned tarball, the initial scan requires it, and the daily schedule
-publishes the mine summary.
+publishes the mine summary. Canonical pillar is overstate:grype with
+legacy baseline:grype merged first (overstate wins).
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -41,7 +42,7 @@ def render_map(pillar=None):
         extensions=["jinja2.ext.do"],
     )
     tpl = env.from_string(
-        "{% from 'baseline/grype/map.jinja' import grype with context %}"
+        "{% from 'overstate/grype/map.jinja' import grype with context %}"
         "{{ grype.severities }}|{{ grype.version }}|{{ grype.top_n }}"
     )
     pillar = pillar or {}
@@ -51,13 +52,21 @@ def render_map(pillar=None):
 
 def test_map_defaults_and_pillar_merge():
     assert render_map() == "HIGH,CRITICAL|v0.120.1|20"
-    assert render_map({"baseline:grype": {"version": "v0.121.0"}}).endswith(
+    assert render_map({"overstate:grype": {"version": "v0.121.0"}}).endswith(
         "|v0.121.0|20"
     )
 
 
+def test_map_legacy_baseline_fallback_and_overstate_wins():
+    legacy = render_map({"baseline:grype": {"version": "v0.119.0"}})
+    assert legacy.endswith("|v0.119.0|20")
+    both = render_map({"baseline:grype": {"version": "v0.119.0"},
+                       "overstate:grype": {"version": "v0.121.0"}})
+    assert both.endswith("|v0.121.0|20")
+
+
 def test_install_fetches_pinned_github_release():
-    rendered = render("baseline/grype/install.sls")
+    rendered = render("overstate/grype/install.sls")
     assert "archive.extracted:" in rendered
     assert "https://github.com/anchore/grype/releases/download/v0.120.1" in rendered
     assert "grype_0.120.1_linux_amd64.tar.gz" in rendered
@@ -68,9 +77,9 @@ def test_install_fetches_pinned_github_release():
 
 def test_install_honors_version_pin_and_arch():
     rendered = render(
-        "baseline/grype/install.sls",
+        "overstate/grype/install.sls",
         pillar={
-            "baseline:grype": {
+            "overstate:grype": {
                 "version": "v0.121.0",
                 "hashes": {"amd64": "sha256=custom_amd64_digest"},
             }
@@ -78,7 +87,7 @@ def test_install_honors_version_pin_and_arch():
     )
     assert "grype_0.121.0_linux_amd64.tar.gz" in rendered
     assert "source_hash: sha256=custom_amd64_digest" in rendered
-    arm = render("baseline/grype/install.sls",
+    arm = render("overstate/grype/install.sls",
                  grains={"os": "Fedora", "os_family": "RedHat",
                          "osrelease": "43", "cpuarch": "aarch64"})
     assert "linux_arm64.tar.gz" in arm
@@ -86,15 +95,15 @@ def test_install_honors_version_pin_and_arch():
 
 
 def test_init_always_includes_all_parts():
-    rendered = render("baseline/grype/init.sls")
-    assert "baseline.grype.install" in rendered
-    assert "baseline.grype.scan" in rendered
-    assert "baseline.grype.schedule" in rendered
+    rendered = render("overstate/grype/init.sls")
+    assert "overstate.grype.install" in rendered
+    assert "overstate.grype.scan" in rendered
+    assert "overstate.grype.schedule" in rendered
     assert "reload_modules: True" in rendered
 
 
 def test_initial_scan_requires_binary():
-    rendered = render("baseline/grype/scan.sls")
+    rendered = render("overstate/grype/scan.sls")
     assert "onlyif: test -x /usr/local/bin/grype" in rendered
     assert "- module: grype_sync_modules" in rendered
     assert "- archive: grype_binary" in rendered
@@ -102,7 +111,7 @@ def test_initial_scan_requires_binary():
 
 
 def test_schedule_renders_daily_publish_for_overstate():
-    rendered = render("baseline/grype/schedule.sls")
+    rendered = render("overstate/grype/schedule.sls")
     # Stable Overstate contracts: snake_case state ID, hyphenated job name.
     assert "grype_cve_scan:" in rendered
     assert "- name: grype-cve-scan" in rendered
@@ -115,24 +124,39 @@ def test_schedule_renders_daily_publish_for_overstate():
 
 def test_schedule_splay_clamped_to_day():
     bad = render(
-        "baseline/grype/schedule.sls",
-        pillar={"baseline:grype": {"schedule_splay": 999999}},
+        "overstate/grype/schedule.sls",
+        pillar={"overstate:grype": {"schedule_splay": 999999}},
     )
     assert "- splay: 600" in bad
     negative = render(
-        "baseline/grype/schedule.sls",
-        pillar={"baseline:grype": {"schedule_splay": -5}},
+        "overstate/grype/schedule.sls",
+        pillar={"overstate:grype": {"schedule_splay": -5}},
     )
     assert "- splay: 600" in negative
     ok = render(
-        "baseline/grype/schedule.sls",
-        pillar={"baseline:grype": {"schedule_splay": 300}},
+        "overstate/grype/schedule.sls",
+        pillar={"overstate:grype": {"schedule_splay": 300}},
     )
     assert "- splay: 300" in ok
 
 
 def test_clean_removes_binary_and_cache():
-    rendered = render("baseline/grype/clean.sls")
+    rendered = render("overstate/grype/clean.sls")
     assert "- name: grype-cve-scan" in rendered
     assert "- name: /usr/local/bin/grype" in rendered
     assert "grype_cache_dir" in rendered
+def test_map_nice_level_default_and_override():
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(SALT_ROOT)),
+        keep_trailing_newline=True,
+        extensions=["jinja2.ext.do"],
+    )
+    tpl = env.from_string(
+        "{% from 'overstate/grype/map.jinja' import grype with context %}"
+        "{{ grype.nice_level }}"
+    )
+    salt = {"pillar.get": lambda key, default=None: {}}
+    assert tpl.render(grains=dict(TW), salt=salt).strip() == "19"
+    salt = {"pillar.get": lambda key, default=None:
+            {"overstate:grype": {"nice_level": 10}}.get(key, default)}
+    assert tpl.render(grains=dict(TW), salt=salt).strip() == "10"

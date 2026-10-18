@@ -16,13 +16,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SALT_ROOT = REPO_ROOT / "salt"
 
 
-def render_updates(auto_dup=False, grains=None):
+def render_updates(auto_dup=False, grains=None, proxy=None):
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(SALT_ROOT)),
         keep_trailing_newline=True,
+        extensions=["jinja2.ext.do"],
     )
     tpl = env.get_template("baseline/updates/init.sls")
-    pillar = {"baseline:updates:auto_dup": auto_dup}
+    pillar = {"baseline:updates:auto_dup": auto_dup,
+              "baseline:proxy": proxy or {}}
     salt = {"pillar.get": lambda key, default=None: pillar.get(key, default)}
     return tpl.render(grains=grains or {"os_family": "Suse"}, salt=salt)
 
@@ -59,3 +61,19 @@ def test_fedora_auto_dup_enables_dnf_upgrade():
     assert "fedora_full_update:" in rendered
     assert "dnf upgrade --refresh -y" in rendered
     assert "- cmd: fedora_full_update" in rendered
+
+
+def test_upgrade_commands_carry_proxy_env():
+    rendered = render_updates(True, {"os_family": "Suse"},
+                              {"http_proxy": "http://proxy:8080",
+                               "https_proxy": "http://proxy:8080",
+                               "no_proxy": "localhost"})
+    assert "- http_proxy: http://proxy:8080" in rendered
+    assert "- HTTPS_PROXY: http://proxy:8080" in rendered
+    assert "- NO_PROXY: localhost" in rendered
+
+
+def test_no_proxy_means_no_env_block():
+    rendered = render_updates(True, {"os_family": "Suse"})
+    assert "- http_proxy:" not in rendered
+    assert "- HTTPS_PROXY:" not in rendered

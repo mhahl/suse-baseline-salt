@@ -6,11 +6,12 @@ on:
     paths:
       - "goss/**"
       - "salt/baseline/**"
+      - "salt/overstate/**"
       - "salt/_modules/**"
       - "reactor/**"
+      - "master.d/**"
       - "tests/**"
-      - "pillar/baseline.sls"
-      - "pillar/top.sls"
+      - "pillar/**"
       - "Makefile"
       - "README.md"
       - "scripts/setup-test-vm.sh"
@@ -21,11 +22,12 @@ on:
     paths:
       - "goss/**"
       - "salt/baseline/**"
+      - "salt/overstate/**"
       - "salt/_modules/**"
       - "reactor/**"
+      - "master.d/**"
       - "tests/**"
-      - "pillar/baseline.sls"
-      - "pillar/top.sls"
+      - "pillar/**"
       - "Makefile"
       - "README.md"
       - "scripts/setup-test-vm.sh"
@@ -103,11 +105,18 @@ jobs:
             --log-level=warning \
             --retcode-passthrough \
             state.sls baseline
+          salt-call --local \
+            --file-root="$SRC/salt" \
+            --pillar-root="$SRC/pillar" \
+            --log-level=warning \
+            --retcode-passthrough \
+            state.sls overstate
 
       - name: Run Goss (baseline)
         run: |
           set -euo pipefail
           goss --gossfile goss/baseline.yaml validate --format tap
+          goss --gossfile goss/overstate.yaml validate --format tap
 
   fedora-latest:
     runs-on: opensuse-tumbleweed
@@ -175,8 +184,15 @@ jobs:
             --log-level=warning \
             --retcode-passthrough \
             state.sls baseline
+          salt-call --local \
+            --file-root="$SRC/salt" \
+            --pillar-root="$SRC/pillar" \
+            --log-level=warning \
+            --retcode-passthrough \
+            state.sls overstate
 
       - name: Run Goss (Fedora baseline)
         run: |
           set -euo pipefail
           goss --gossfile goss/fedora.yaml validate --format tap
+          goss --gossfile goss/overstate.yaml validate --format tap

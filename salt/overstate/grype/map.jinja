@@ -1,0 +1,43 @@
+{# overstate/grype/map.jinja — pillar-overridable defaults.
+   Canonical key is overstate:grype. baseline:grype is honored as a
+   legacy fallback (merged first, overstate wins) so existing fleets
+   keep working while migrating pillar to overstate:grype.
+   Grype ships no distro package on either platform: install.sls fetches
+   the pinned GitHub release tarball to /usr/local/bin/grype over TLS.
+   Overstate contracts: the grype-cve-scan job name and both mine
+   keys (grype.scan_summary slim + grype.scan_detail full) are stable —
+   do not rename.
+   skip_db_update=True means offline scans only: manage the DB
+   externally (grype db update) or results go stale.
+   schedule_splay is clamped 0..86400 in schedule.sls (default 600).
+   top_n is clamped 0..100 in grype_scan.py (default 20).
+   nice_level is clamped 0..19 in grype_scan.py (default 19, lowest CPU
+   priority) so daily scans never starve production workloads; I/O runs
+   idle-class via ionice when available. #}
+{% set _default_hashes = {
+  'amd64': 'sha256=0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d',
+  'arm64': 'sha256=29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514',
+} %}
+{% set grype = {
+  'version': 'v0.120.1',
+  'hashes': dict(_default_hashes),
+  'severities': 'HIGH,CRITICAL',
+  'top_n': 20,
+  'skip_db_update': False,
+  'cache_dir': '/var/cache/grype',
+  'report_path': '/var/cache/grype/report.json',
+  'run_initial_scan': True,
+  'schedule_splay': 600,
+  'nice_level': 19,
+} %}
+{% set _over = salt['pillar.get']('overstate:grype', {}) %}
+{% set _legacy = salt['pillar.get']('baseline:grype', {}) %}
+{% set _merged_pillar = {} %}
+{% do _merged_pillar.update(_legacy) %}
+{% do _merged_pillar.update(_over) %}
+{% do grype.update(_merged_pillar) %}
+{% set _merged_hashes = dict(_default_hashes) %}
+{% if _merged_pillar.get('hashes') is mapping %}
+{% do _merged_hashes.update(_merged_pillar.get('hashes')) %}
+{% endif %}
+{% do grype.update({'hashes': _merged_hashes}) %}

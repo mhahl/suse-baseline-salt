@@ -5,8 +5,8 @@ gossfile:
   schedule.yaml: {}
   systemd-resolved.yaml: {}
   timesyncd.yaml: {}
-  grype.yaml: {}
   usb.yaml: {}
+  overstate.yaml: {}
   fedora/freeipa.yaml: {}
   fedora/netbird.yaml: {}
   fedora/updates.yaml: {}

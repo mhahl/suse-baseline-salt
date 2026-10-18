@@ -1,0 +1,24 @@
+# Example master config for GPG-encrypted pillar (same convention as
+# reactor/reactor.conf.example: master-side wiring, never applied from
+# the repo). Copy to /etc/salt/master.d/gpg.conf on the master host
+# (adapt the keydir to your layout), import the private key there, then:
+#   systemctl reload salt-master  (Overstate prod: restart salt-master container)
+#
+# The keydir MUST live outside the Overstate bind mount
+# (/var/lib/overstate/srv): Files -> Sync now syncs the repo checkout
+# (ciphertext is safe in git), but the private key must never be
+# committed or synced. Use a persistent volume, mode 0700, owned by the
+# user the master workers run as (root:root on rootful, invoking user on
+# rootless — same ownership rule as `make overstate-checkout` reports).
+#
+# Key lifecycle (run as the master user):
+#   gpg --homedir /etc/salt/gpgkeys --gen-key        # no passphrase: unattended master
+#   gpg --homedir /etc/salt/gpgkeys --import private.key
+#   gpg --homedir /etc/salt/gpgkeys --import-ownertrust  # mark ultimately trusted (6)
+#   echo -n 's3cret' | gpg --homedir /etc/salt/gpgkeys --encrypt --armor -r <key-id>
+#
+# Verify after wiring (targeted pillar.get — never pillar.items in shared
+# terminals; returns are visible in Overstate Jobs):
+#   salt 'one-minion' saltutil.refresh_pillar
+#   salt 'one-minion' pillar.get baseline:freeipa:join
+gpg_keydir: /etc/salt/gpgkeys

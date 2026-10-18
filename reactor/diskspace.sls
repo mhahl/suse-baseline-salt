@@ -1,8 +1,9 @@
-{# Reactor: bounded cleanup when the diskspace beacon fires. This
-   baseline's disk hogs are the journal, zypper caches, and the grype
-   vulnerability DB — all regenerable — so vacuuming them automatically
-   is safe. The grype report.json (mine source of truth for Overstate's
-   Mine tab) is kept: only db/* is removed. Feeding beacon:
+{# Reactor: bounded cleanup when the diskspace beacon fires. Disk hogs
+   here are the journal, package-manager caches, and the grype
+   vulnerability DB (overstate.grype) — all regenerable — so vacuuming
+   them automatically is safe. The grype report.json (mine source of
+   truth for Overstate's Mine tab) is kept: only db/* is removed.
+   Feeding beacon:
      beacons:
        diskspace:
          - interval: 300

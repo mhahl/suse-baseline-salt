@@ -36,8 +36,8 @@ help:
 	@echo "Testing:"
 	@echo "  lint                Run yamllint over the repository"
 	@echo "  test                Run pytest unit/render tests"
-	@echo "  goss                Run all Goss tests (requires goss + target system state)"
-	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-timesyncd, make goss-baseline"
+	@echo "  goss                Run all Goss tests (baseline + overstate)"
+	@echo "  goss-<name>         Run specific Goss test, e.g. make goss-timesyncd, make goss-overstate"
 	@echo "  install-goss        Download a local goss binary to ./bin/goss"
 	@echo "  clean               Remove local goss binary"
 	@echo
@@ -56,6 +56,7 @@ help:
 	@echo "  apply               Shortcut for 'state.apply baseline' (or MODULE=...)"
 	@echo "                      Examples:"
 	@echo "                        sudo make apply"
+	@echo "                        sudo make apply MODULE=overstate.grype test=True"
 	@echo "                        sudo make apply MODULE=baseline test=True"
 	@echo
 	@echo "  highstate           Run state.highstate using the local repo tree."
@@ -82,9 +83,11 @@ test:
 	python3 -m pytest tests/ -q
 
 GOSS_FILE ?= $(shell if [ -f /etc/os-release ] && grep -q '^ID=fedora' /etc/os-release; then echo goss/fedora.yaml; else echo goss/goss.yaml; fi)
+GOSS_OVERSTATE ?= goss/overstate.yaml
 
 goss: goss-binary
 	$(GOSS) --gossfile $(GOSS_FILE) validate
+	$(GOSS) --gossfile $(GOSS_OVERSTATE) validate
 
 goss-%: goss-binary
 	$(GOSS) --gossfile goss/$*.yaml validate
@@ -123,8 +126,8 @@ links:
 # Drop stale nested links from older layouts, then link the trees themselves.
 # -T (GNU ln, available on the SUSE target) treats the destination as a plain
 # file so an existing /srv/salt directory can never silently become /srv/salt/salt.
-	@rm -f $(SALT_SRV)/salt $(SALT_SRV)/baseline $(SALT_SRV)/_modules $(SALT_SRV)/top.sls
-	@rm -f $(PILLAR_SRV)/pillar $(PILLAR_SRV)/top.sls $(PILLAR_SRV)/baseline.sls
+	@rm -f $(SALT_SRV)/salt $(SALT_SRV)/baseline $(SALT_SRV)/overstate $(SALT_SRV)/_modules $(SALT_SRV)/top.sls
+	@rm -f $(PILLAR_SRV)/pillar $(PILLAR_SRV)/top.sls $(PILLAR_SRV)/baseline.sls $(PILLAR_SRV)/overstate.sls
 	@rmdir $(SALT_SRV) $(PILLAR_SRV) 2>/dev/null || true
 	@ln -sfnT $(REPO_ROOT)/salt $(SALT_SRV)
 	@ln -sfnT $(REPO_ROOT)/pillar $(PILLAR_SRV)
@@ -259,8 +262,8 @@ overstate-checkout:
 	fi
 	@echo "Checkout ready. Verify the master serves the tree, then apply:"
 	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.update"
-	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.file_list saltenv=base | grep -c baseline"
-	@echo "  # nonzero count -> apply from Overstate Jobs: state.apply baseline (or highstate)."
+	@echo "  podman exec $(OVERSTATE_MASTER) salt-run fileserver.file_list saltenv=base | grep -c -e baseline -e overstate"
+	@echo "  # nonzero count -> apply from Overstate Jobs: state.apply overstate (or baseline, or highstate)."
 	@echo "  # zero count -> the container does not see $(OVERSTATE_SRV): check its bind mounts"
 	@echo "  # and the master's file_roots before re-running this target."
 	@echo "  # Afterwards, Overstate Files -> Sync now fast-forwards this checkout."

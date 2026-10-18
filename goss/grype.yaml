@@ -1,4 +1,4 @@
-# Goss tests for baseline.grype
+# Goss tests for overstate.grype (decoupled from baseline)
 #
 # Schedule job names are asserted here (not in goss/schedule.yaml) so
 # `make goss-schedule` after only baseline.schedule still passes.

@@ -12,9 +12,9 @@ include:
   - baseline.banner
   - baseline.minion
   - baseline.profile
+  - baseline.proxy
   - baseline.systemd-resolved
   - baseline.timesyncd
-  - baseline.grype
   - baseline.usb
 {% if _is_tw %}
   - baseline.suse

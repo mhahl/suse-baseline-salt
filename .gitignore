@@ -31,6 +31,16 @@ highstate-*.out
 rendered-*.sls
 /srv/salt/
 
+# Secrets: local-only plaintext staging and private key material must
+# never be committed. GPG ciphertext (*.sls under pillar/secrets/) IS
+# safe to commit — the guard is the private key, which lives in
+# /etc/salt/gpgkeys on the master (see master.d/gpg.conf.example).
+pillar/secrets.local/
+*.plaintext
+*.gpg-key
+secring.*
+gpgkeys/
+
 # IDE / editors
 .vscode/
 *.swp

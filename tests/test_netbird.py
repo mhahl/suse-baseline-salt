@@ -1,11 +1,13 @@
 """Render tests for baseline.netbird client installs.
 
 The module adds the official NetBird RPM repo, installs the client
-package, and enables the daemon (no network join — `netbird up` needs
-an SSO login or a setup key). Disabling it must remove the repo and
-stop the daemon but keep already-installed packages, mirroring how the
-croniter providers stay installed in baseline.schedule's disabled
-branches.
+package, and enables the daemon. Network join (`netbird up`) is opt-in
+via join.enabled + setup_key (encrypted pillar): the key is passed via
+env with hide_output so it never lands in the state name, and the join
+is skipped when `netbird status` already reports connected. Disabling
+must remove the repo and stop the daemon but keep already-installed
+packages, mirroring how the croniter providers stay installed in
+baseline.schedule's disabled branches.
 
 Run from the repo root: ``python3 -m pytest tests/ -q``.
 """
@@ -85,3 +87,43 @@ def test_fedora_uses_repo_signing_and_skips_zypper_auto_import():
     assert "- netbird" in rendered
     assert "- fromrepo: netbird" in rendered
     assert "service.running:" in rendered
+
+
+def test_join_disabled_by_default():
+    rendered = render_netbird({})
+    assert "netbird_join:" not in rendered
+    assert "NB_SETUP_KEY" not in rendered
+
+
+def test_join_enabled_renders_idempotent_secret_free_command():
+    rendered = render_netbird({"join": {"enabled": True, "setup_key": "KEY-123"}})
+    assert "netbird_join:" in rendered
+    assert "cmd.run:" in rendered
+    # Secret via env, never inline in the state name.
+    assert "- NB_SETUP_KEY: KEY-123" in rendered
+    assert 'netbird up --setup-key "$NB_SETUP_KEY"' in rendered
+    assert "--setup-key KEY-123" not in rendered
+    assert "hide_output: True" in rendered
+    assert "output_loglevel: quiet" in rendered
+    assert "unless: netbird status" in rendered
+    assert "grep -qi connected" in rendered
+    assert "- pkg: netbird_client" in rendered
+    assert "- service: netbird_service" in rendered
+
+
+def test_join_optional_flags():
+    rendered = render_netbird({"join": {
+        "enabled": True, "setup_key": "K",
+        "hostname": "web01", "management_url": "https://nb.example.com",
+        "extra_args": "--rosenpass-permissive",
+    }})
+    assert "--hostname web01" in rendered
+    assert "--management-url https://nb.example.com" in rendered
+    assert "--rosenpass-permissive" in rendered
+
+
+def test_join_missing_key_fails_closed():
+    rendered = render_netbird({"join": {"enabled": True}})
+    assert "test.fail_without_changes:" in rendered
+    assert "join:setup_key is required" in rendered
+    assert "netbird_join:" not in rendered

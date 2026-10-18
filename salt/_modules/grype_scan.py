@@ -10,7 +10,8 @@ findings under ``grype.scan_detail`` for per-minion readers. Because
 files, and pushes them through the ``cached_summary`` /
 ``cached_detail`` reader functions. The mine never carries the raw
 multi-megabyte Grype JSON. All behavior is driven by
-``baseline:grype`` in ``pillar/baseline.sls``.
+``overstate:grype`` in ``pillar/overstate/01-grype.sls``
+(``baseline:grype`` is honored as a legacy fallback during migration).
 
 Overstate notes: both mine keys and the ``grype-cve-scan`` job name are
 stable contracts — the Schedules tab reads them via ``schedule.list``,
@@ -18,12 +19,20 @@ the Mine tab reads ``grype.scan_summary``, and the Vulnerabilities UI
 reads both keys. ``publish`` uses ``mine.send`` (not ``mine_functions``
 pillar) so no minion restart is needed, but ``mine.update`` does NOT
 refresh either key: they live only as long as the daily schedule
-refreshes them (see ``schedule.sls``).
+refreshes them (see ``overstate/grype/schedule.sls``).
 
 ``skip_db_update: True`` means offline scans only — the DB is never
 refreshed by this module. Manage it externally (e.g. ``grype db update``)
 or scans go stale silently. The DB cache lives under
 ``<cache_dir>/db`` via ``GRYPE_DB_CACHE_DIR``.
+
+Scans run at the lowest CPU priority (``nice_level`` 0..19, default 19)
+via ``os.nice`` in the child process plus idle I/O class via ``ionice``
+when the binary exists — daily scans never starve production workloads.
+
+Egress proxy comes from ``baseline:proxy`` (``http_proxy``,
+``https_proxy``, ``no_proxy``; empty = direct). Both lowercase and
+uppercase variants are exported since tooling disagrees on case.
 """
 
 import datetime as _dt
@@ -45,7 +54,12 @@ _SEVERITY_RANK = {
 
 
 def _opt(name, default=None):
+    # Canonical: overstate:grype. Legacy baseline:grype merges first so
+    # existing fleets keep working while migrating pillar.
     try:
+        over = __pillar__.get("overstate", {}).get("grype", {})  # noqa: F821
+        if isinstance(over, dict) and name in over:
+            return over[name]
         return __pillar__.get("baseline", {}).get("grype", {}).get(name, default)  # noqa: F821
     except (AttributeError, NameError):
         return default
@@ -53,7 +67,7 @@ def _opt(name, default=None):
 
 def _grype_bin():
     # GitHub releases install to /usr/local/bin/grype (see
-    # baseline/grype/install.sls). No distro package exists on either
+    # overstate/grype/install.sls). No distro package exists on either
     # platform, so there is a single canonical path plus PATH fallback.
     if _os.path.exists("/usr/local/bin/grype"):
         return "/usr/local/bin/grype"
@@ -67,6 +81,49 @@ def _coerce_top_n(value, default=20):
     except (TypeError, ValueError):
         return default
     return max(0, min(100, number))
+
+
+def _coerce_nice_level(value, default=19):
+    """Clamp scan CPU priority to 0..19 (19 = lowest), never raises."""
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(19, number))
+
+
+def _proxy_opts():
+    """Egress proxy from baseline:proxy (empty values = direct)."""
+    try:
+        proxy = __pillar__.get("baseline", {}).get("proxy", {})  # noqa: F821
+    except (AttributeError, NameError):
+        return {}
+    if not isinstance(proxy, dict):
+        return {}
+    out = {}
+    for key in ("http_proxy", "https_proxy", "no_proxy"):
+        value = proxy.get(key, "")
+        if isinstance(value, str) and value:
+            out[key] = value
+    return out
+
+
+def _nice_preexec(level):
+    """Return a preexec_fn lowering the scan child to ``level``."""
+    def _lower():
+        try:
+            _os.nice(level)
+        except OSError:
+            pass
+    return _lower
+
+
+def _ionice_prefix():
+    """Prefix grype with idle I/O class when ionice exists, else []."""
+    for candidate in ("/usr/bin/ionice", "/bin/ionice"):
+        if _os.path.exists(candidate):
+            return [candidate, "-c3"]
+    return []
 
 
 def _grype_version(binpath, env=None):
@@ -244,6 +301,9 @@ def _scan_env(cache_dir, skip_db_update):
     if cache_dir:
         env["GRYPE_DB_CACHE_DIR"] = _os.path.join(cache_dir, "db")
     env["GRYPE_DB_AUTO_UPDATE"] = "false" if skip_db_update else "true"
+    for key, value in _proxy_opts().items():
+        env[key] = value
+        env[key.upper()] = value
     return env
 
 
@@ -288,7 +348,8 @@ def scan(severities=None, top_n=None):
     skip_db_update = bool(_opt("skip_db_update", False))
     binpath = _grype_bin()
     env = _scan_env(cache_dir, skip_db_update)
-    cmd = [
+    nice_level = _coerce_nice_level(_opt("nice_level", 19))
+    cmd = _ionice_prefix() + [
         binpath, "dir:/",
         "-o", "json",
         "--file", report_path,
@@ -308,11 +369,12 @@ def scan(severities=None, top_n=None):
     try:
         proc = _subprocess.run(
             cmd, capture_output=True, text=True, timeout=1800, env=env,
+            preexec_fn=_nice_preexec(nice_level),
         )
     except FileNotFoundError:
         return {"minion": __grains__.get("id", ""),  # noqa: F821
                 "error": "grype binary not found at {}: apply "
-                         "baseline.grype on this minion - its install step "
+                         "overstate.grype on this minion - its install step "
                          "failed or never ran".format(binpath)}
     except (OSError, _subprocess.SubprocessError) as exc:
         return {"minion": __grains__.get("id", ""),  # noqa: F821
