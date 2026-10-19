@@ -2,11 +2,18 @@ systemd_resolved_package:
   pkg.installed:
     - name: systemd-resolved
 
+# systemd-resolved drops privileges and runs as the unprivileged
+# systemd-resolve user; it updates /run/systemd/resolve/resolv.conf by
+# writing a temp file in this directory and renaming it into place.
+# Ownership MUST match systemd's tmpfiles.d definition
+# (0755 systemd-resolve:systemd-resolve) — root:root here breaks the
+# daemon with "Failed to open new .../resolv.conf for writing:
+# Permission denied".
 resolved_runtime_dir:
   file.directory:
     - name: /run/systemd/resolve
-    - user: root
-    - group: root
+    - user: systemd-resolve
+    - group: systemd-resolve
     - mode: '0755'
     - makedirs: True
     - require:
