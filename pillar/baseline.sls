@@ -34,4 +34,3 @@ include:
   - baseline.10-mine
   - baseline.11-proxy
   - baseline.12-firewalld
-  - baseline.13-sysctl
