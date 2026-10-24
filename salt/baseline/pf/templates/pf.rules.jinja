@@ -1,0 +1,16 @@
+{# Allow-list anchor ruleset for baseline.pf (FreeBSD). Mirrors
+   baseline.firewalld's default-zone semantics: block inbound except the
+   declared services, keep loopback open, and trust the NetBird mesh
+   interface (wt0 by default). Outbound stays at PF's default (pass).
+   Service entries use /etc/services names (ssh, http, ...) or bare
+   ports. NOTE: PF is first-match-wins — an earlier broad `pass in all`
+   in the host's pf.conf passes traffic before this anchor is reached;
+   the anchor cannot override a wider pre-existing pass. #}
+block in
+pass in quick on lo0
+{% for svc in services %}
+pass in proto tcp from any to any port {{ svc }}
+{% endfor %}
+{% if nb_enabled and nb_trusted %}
+pass in on {{ nb_iface }}
+{% endif %}

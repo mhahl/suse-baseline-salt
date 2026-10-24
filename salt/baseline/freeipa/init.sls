@@ -15,8 +15,16 @@
    baseline.schedule.
    On Tumbleweed, zypper prompts to trust rotated keys, so both states
    pass gpgautoimport (zypper's --gpg-auto-import-keys). Fedora installs
-   from base repos and does not use those zypper options. #}
+   from base repos and does not use those zypper options.
+   FreeBSD: NOT supported by this baseline (no client enrollment; the
+   identity story there is local accounts — see README). Skipped, not
+   failed, so highstate stays green on FreeBSD hosts. #}
 {% set _family = grains.get('os_family', '') %}
+{% if _family == 'FreeBSD' %}
+freebsd_freeipa_skipped:
+  test.skip_sls:
+    - name: baseline.freeipa unsupported on FreeBSD; skipped
+{% else %}
 {% set cfg = salt['pillar.get']('baseline:freeipa', {}) %}
 {% set enabled = cfg.get('enabled', True) %}
 {% set repo_name = cfg.get('repo_name', 'security:idm') %}
@@ -84,4 +92,5 @@ freeipa_join:
 freeipa_obs_repo:
   pkgrepo.absent:
     - name: {{ repo_name }}
+{% endif %}
 {% endif %}

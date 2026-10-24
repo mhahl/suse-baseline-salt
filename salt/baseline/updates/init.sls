@@ -51,6 +51,26 @@ updates_dnf_conf_exists:
     - user: root
     - group: root
     - mode: '0644'
+{% elif _family == 'FreeBSD' %}
+{# FreeBSD: switch pkg to the `latest` branch (rolling, consistent with
+   this fleet's Tumbleweed flavor) via a user repo override.
+   replace: False never clobbers an existing repo override; the vendor
+   default quarterly branch is left untouched where present. #}
+updates_pkg_repo_latest:
+  file.managed:
+    - name: /usr/local/etc/pkg/repos/FreeBSD.conf
+    - contents: |
+        FreeBSD: {
+          url: "pkg+http://pkg.FreeBSD.org/${ABI}/latest",
+          mirror_type: "srv",
+          signature_type: "fingerprints",
+          fingerprints: "/usr/share/keys/pkg",
+          enabled: yes
+        }
+    - replace: False
+    - user: root
+    - group: wheel
+    - mode: '0644'
 {% endif %}
 
 {% if auto_dup and _family == 'Suse' %}
@@ -80,12 +100,28 @@ fedora_full_update:
       - {{ key }}: {{ value }}
 {% endfor %}
 {% endif %}
+{% elif auto_dup and _family == 'FreeBSD' %}
+freebsd_full_update:
+  cmd.run:
+    - name: pkg upgrade -y
+    - onlyif: pkg version -l '<' 2>/dev/null | grep -q .
+    - timeout: 3600
+{% if _proxy_env %}
+    - env:
+{% for key, value in _proxy_env %}
+      - {{ key }}: {{ value }}
+{% endfor %}
+{% endif %}
 {% endif %}
 
 # Record changes only when package-manager configuration or an update changes.
 last_update_marker:
   cmd.run:
+{% if _family == 'FreeBSD' %}
+    - name: date "+%Y-%m-%dT%H:%M:%S%z" > /var/log/baseline-last-update
+{% else %}
     - name: date -Iseconds > /var/log/baseline-last-update
+{% endif %}
     - onchanges:
 {% if _family == 'Suse' %}
       - file: updates_zypper_config
@@ -96,5 +132,10 @@ last_update_marker:
       - file: updates_dnf_conf_exists
 {% if auto_dup %}
       - cmd: fedora_full_update
+{% endif %}
+{% elif _family == 'FreeBSD' %}
+      - file: updates_pkg_repo_latest
+{% if auto_dup %}
+      - cmd: freebsd_full_update
 {% endif %}
 {% endif %}

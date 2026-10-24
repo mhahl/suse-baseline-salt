@@ -1,0 +1,43 @@
+{% if dns.get('dns') %}
+{# Forwarding zone: everything goes upstream over DNS-over-TLS.
+   forward-addr entries are rendered from the pillar's systemd-resolved
+   style "IP#auth-name" list (see baseline/unbound/init.sls). The
+   #name authenticates the upstream TLS certificate. #}
+forward-zone:
+    name: "."
+    forward-tls-upstream: yes
+{% for entry in dns.get('dns').split() %}
+    forward-addr: {{ entry.replace('#', '@853#') }}
+{% endfor %}
+{% endif %}
+
+server:
+    # Local stub listener only — resolution never leaves this host unencrypted.
+    interface: 127.0.0.1
+    access-control: 127.0.0.0/8 allow
+    do-ip4: yes
+    do-ip6: no
+    do-udp: yes
+    do-tcp: yes
+    do-daemonize: no
+
+    # DNSSEC validation with an auto-refreshed root anchor.
+    auto-trust-anchor-file: /var/db/unbound/root.key
+    # CA bundle for validating DoT upstream certificates.
+    tls-cert-bundle: /usr/local/share/certs/ca-root-nss.crt
+
+    # Mirror systemd-resolved's Cache=no-negative: no negative caching,
+    # so resolution never hides a newly-published record.
+    cache-max-negative-ttl: 0
+
+    # Hardening mirrors the baseline's resolved.conf stance: hide
+    # identity, refuse to leak internal structure, minimise queries.
+    hide-identity: yes
+    hide-version: yes
+    harden-glue: yes
+    qname-minimisation: yes
+
+    # Drop privileges and run from the package's working directory.
+    username: unbound
+    directory: /var/db/unbound
+    pidfile: /var/run/unbound.pid

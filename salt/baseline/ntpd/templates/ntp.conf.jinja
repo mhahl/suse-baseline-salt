@@ -1,0 +1,19 @@
+{% set servers = ntp.get('servers', ['pool.ntp.org']) %}
+{% set fallback = ntp.get('fallback', []) %}
+{# Clock sync via FreeBSD's base ntpd (baseline.ntpd) — the FreeBSD
+   counterpart of baseline.timesyncd. Server list from baseline:ntp
+   (servers, optional fallback). `iburst` accelerates the initial sync;
+   restrict defaults harden the daemon; driftfile records the frequency
+   error. FreeBSD base ntpd is the only NTP client managed on these
+   hosts. #}
+tos minclock 3 maxclock 6
+{% for server in servers %}
+server {{ server }} iburst
+{% endfor %}
+{% for server in fallback %}
+pool {{ server }} iburst
+{% endfor %}
+restrict default limited kod nomodify notrap nopeer noquery
+restrict source limited kod nomodify notrap noquery
+restrict 127.0.0.1
+driftfile /var/db/ntpd.drift

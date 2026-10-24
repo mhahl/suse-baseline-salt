@@ -1,10 +1,11 @@
 # SUSE Baseline
 
-> SaltStack states + pillar: a focused security/forensics `baseline` on **openSUSE Tumbleweed and Fedora** (fails fast on unsupported grains) plus a decoupled `overstate` namespace (fleet visibility — Grype CVE scanning to the Salt Mine) reusable with zero baseline configuration.
+> SaltStack states + pillar: a focused security/forensics `baseline` on **openSUSE Tumbleweed, Fedora, and FreeBSD 15+** (fails fast on unsupported grains) plus a decoupled `overstate` namespace (fleet visibility — Grype CVE scanning to the Salt Mine) reusable with zero baseline configuration.
 
 [![Salt](https://img.shields.io/badge/Salt-3006%2B-blue)](https://saltproject.io/)
 [![openSUSE](https://img.shields.io/badge/openSUSE-Tumbleweed-green)](https://www.opensuse.org/)
 [![Fedora](https://img.shields.io/badge/Fedora-supported-blue?logo=fedora)](https://getfedora.org/)
+[![FreeBSD](https://img.shields.io/badge/FreeBSD-15%2B-WIP?logo=freebsd&logoColor=red)](https://www.freebsd.org/)
 [![Goss](https://img.shields.io/badge/Tests-Goss-orange)](https://goss.rocks/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -14,14 +15,14 @@
 
 | Category | Modules |
 |----------|---------|
-| **Supported OS** | openSUSE Tumbleweed, Fedora |
-| **System (baseline)** | `banner`, `profile`, `systemd-resolved`, `timesyncd`, `updates`, `schedule`, `freeipa`, `netbird`, `minion` |
+| **Supported OS** | openSUSE Tumbleweed, Fedora, FreeBSD 15+ (WIP) |
+| **System (baseline)** | `banner`, `profile`, `systemd-resolved`/`unbound`, `timesyncd`/`ntpd`, `firewalld`/`pf`, `updates`, `schedule`, `freeipa`, `netbird`, `minion` |
 | **Visibility (overstate)** | `grype` (install + scan + daily schedule + clean, mine keys `grype.scan_summary`/`grype.scan_detail`) |
 | **Hardening** | `usb` |
 
 - **Forensic-ready** bash history and session controls
-- **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP via systemd-timesyncd — the only NTP client here)
-- **Modern security controls** (USB storage blocking)
+- **Strong privacy defaults** (DNS-over-TLS + DNSSEC, hardened NTP — the only NTP client per platform: systemd-timesyncd on Linux, base `ntpd` on FreeBSD)
+- **Modern security controls** (USB storage blocking on Linux; PF allow-list firewall on FreeBSD)
 - **Vulnerability scanning (overstate)** — daily Grype filesystem scans with summaries published to the Salt Mine (`grype.scan_summary` slim + `grype.scan_detail` full), no baseline required
 - **Identity and mesh VPN clients** — FreeIPA from OBS on Tumbleweed or Fedora base repositories, and NetBird from its official repo (install + opt-in auto-join via pillar)
 - **Overstate-ready scheduling** — hourly mine updates, nightly highstate, and daily jobs, visible in Overstate's Schedules tab
@@ -178,18 +179,22 @@ salt/
     ├── init.sls            # grain guard + shared module includes (no grype)
     ├── redhat/             # Fedora group includes freeipa, netbird, schedule, updates
     ├── suse/               # Tumbleweed group includes freeipa, netbird, schedule, updates
+    ├── freebsd/            # FreeBSD 15+ group includes netbird, schedule, updates (no freeipa)
     ├── banner/
-    ├── freeipa/            # OBS repo on Tumbleweed; Fedora base package + opt-in ipa-client-install join
+    ├── freeipa/            # OBS repo on Tumbleweed; Fedora base package + opt-in ipa-client-install join (skipped on FreeBSD)
     ├── grype/              # DEPRECATED shim -> overstate.grype (one release)
     ├── minion/             # minion master address: IP, not DNS
-    ├── netbird/            # official NetBird repo + daemon + opt-in `netbird up` join
+    ├── netbird/            # official NetBird repo + daemon + opt-in `netbird up` join (FreeBSD: official pkg port)
+    ├── ntpd/               # FreeBSD NTP via base ntpd (counterpart of timesyncd)
+    ├── pf/                 # FreeBSD firewall via a PF anchor (counterpart of firewalld)
     ├── profile/
-    ├── proxy/              # egress proxy env + native tool config
+    ├── proxy/              # egress proxy env + native tool config (FreeBSD: pkg.conf PKG_ENV)
     ├── schedule/           # mine-update-hourly, highstate-nightly, sync-modules-daily
-    ├── systemd-resolved/   # DoT resolvers + stub symlink + netconfig guard
-    ├── timesyncd/          # NTP via systemd-timesyncd
-    ├── updates/            # zypp on Tumbleweed; minimal DNF config + optional upgrade on Fedora
-    └── usb/                # USB mass-storage blacklist
+    ├── systemd-resolved/   # DoT resolvers + stub symlink + netconfig guard (Linux)
+    ├── timesyncd/          # NTP via systemd-timesyncd (Linux)
+    ├── unbound/            # FreeBSD DNS via dns/unbound DoT (counterpart of systemd-resolved)
+    ├── updates/            # zypp on Tumbleweed; minimal DNF config on Fedora; pkg latest on FreeBSD
+    └── usb/                # USB mass-storage blacklist (Linux only)
 
 pillar/
 ├── baseline.sls            # aggregator over baseline/*.sls
@@ -262,6 +267,20 @@ cat /etc/salt/minion.d/_schedule.conf
 salt-call schedule.list
 salt-call mine.update && salt-call mine.get '*' grains.items
 
+# --- FreeBSD 15+ (WIP — no Goss/CI; manual verification) ---
+# Apply locally:
+#   salt-call --local --file-root=/srv/salt --pillar-root=/srv/pillar state.apply baseline test=True
+# Clock + DNS + firewall + identity skips:
+ntpq -p                                  # base ntpd syncing
+unbound-checkconf /usr/local/etc/unbound/unbound.conf
+cat /etc/resolv.conf                     # nameserver 127.0.0.1 (unbound stub)
+pfctl -s rules | head -20                # baseline anchor loaded (only when PF runs)
+cat /etc/motd                            # banner (no /etc/motd.d on FreeBSD)
+sysrc -a | grep -E 'ntpd|unbound|netbird'  # rc.conf service state
+pkg version -l '<'                       # pending upgrades (latest branch)
+# Skipped on FreeBSD (highstate stays green):
+#   overstate.grype, baseline.freeipa, baseline.usb; baseline.ssh unchanged/parked.
+
 # Vulnerability scanning via overstate.grype (report is 0640, summary + detail go to mine)
 salt '*' state.apply overstate.grype
 ls -l /var/cache/grype/report.json
@@ -333,7 +352,9 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 - **Grype migration (`baseline.grype` → `overstate.grype`):** `state.apply baseline` no longer pulls scanning; highstate still does both (`salt/top.sls`: `- baseline`, `- overstate`). Move pillar verbatim `baseline:{grype:{...}}` → `overstate:{grype:{...}}` (legacy key still merges as fallback, overstate wins). `state.apply baseline.grype` still works for one release via deprecated shim. Goss: `make goss` now validates baseline/fedora **plus** `goss/overstate.yaml`; CI applies `baseline` then `overstate` and validates both suites.
 
-- **Supported platforms:** openSUSE Tumbleweed and Fedora. The guard keeps the existing Tumbleweed grain variants and admits Fedora only for `os_family=RedHat` and `os=Fedora`; other platforms fail fast.
+- **Supported platforms:** openSUSE Tumbleweed, Fedora, and **FreeBSD 15+** (bare metal/VM, no jails). The guard keeps the existing Tumbleweed grain variants, admits Fedora only for `os_family=RedHat` and `os=Fedora`, and admits FreeBSD only for `os_family=FreeBSD` with a 15.x-or-newer release; other platforms fail fast.
+
+- **FreeBSD support is WIP.** Unlike the Linux families it has **no Goss suite and no CI job yet** — verification is manual (`salt-call --local state.apply baseline test=True` on a real 15.x host). What is deliberately *not* applied on FreeBSD: `overstate.grype` and `baseline.freeipa` (both skip, highstate stays green), `baseline.usb` (not included), and `baseline.ssh` is applied unchanged but parked — it ships SSSD/GSSAPI lines that are inert there, so identity on FreeBSD is local accounts + `~/.ssh/authorized_keys` until that module is revisited. FreeBSD-specific choices: base `ntpd` for NTP (chrony is not installed), `dns/unbound` for DNS-over-TLS (base `local_unbound` is deliberately not used — its generated config fights `file.managed`), the `pkg` `latest` branch (rolling, matching Tumbleweed), and a PF **anchor** firewall that never owns `/etc/pf.conf` and never auto-enables PF.
 - **USB storage** is blocked by default (set `baseline:usb:block_storage: false` to allow it — that removes a previously deployed blacklist file).
 - **Automatic upgrades are disabled by default** — set `baseline:updates:auto_dup: true` to enable `zypper dup` on Tumbleweed or `dnf upgrade --refresh` on Fedora.
 - **Package-manager behavior branches by family:** FreeIPA uses OBS on Tumbleweed and Fedora's base repositories; NetBird signing configuration differs between zypper and DNF.
@@ -344,7 +365,7 @@ Wiring (one time): `make overstate-checkout` ships `reactor/`; copy `reactor/rea
 
 ## 📋 Requirements
 
-- Salt minion on openSUSE Tumbleweed or Fedora
+- Salt minion on openSUSE Tumbleweed, Fedora, or FreeBSD 15+
 - Root access for package installation
 
 ---

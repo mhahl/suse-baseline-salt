@@ -8,6 +8,8 @@
    like the croniter providers in baseline.schedule.
    On Tumbleweed, zypper needs gpgautoimport for non-interactive repo
    refreshes. Fedora uses the repo's gpgkey and repo_gpgcheck instead.
+   FreeBSD installs the official security/netbird port straight from the
+   FreeBSD pkg repos — no external repo, no signing dance.
    Join is opt-in via baseline:netbird:join:enabled + setup_key (store
    the key in encrypted pillar — GPG/sops/Vault — never plaintext).
    The key is passed via env (NB_SETUP_KEY) with hide_output + quiet
@@ -58,12 +60,16 @@ netbird_client:
 {% for pkg in packages %}
       - {{ pkg }}
 {% endfor %}
+{% if _family in ['Suse', 'RedHat'] %}
     - fromrepo: {{ repo_name }}
+{% endif %}
 {% if _family == 'Suse' %}
     - gpgautoimport: True
 {% endif %}
+{% if _family in ['Suse', 'RedHat'] %}
     - require:
       - pkgrepo: netbird_repo
+{% endif %}
 
 {% if enable_service %}
 netbird_service:
@@ -102,9 +108,11 @@ netbird_join:
 {% endif %}
 {% endif %}
 {% else %}
+{% if _family in ['Suse', 'RedHat'] %}
 netbird_repo:
   pkgrepo.absent:
     - name: {{ repo_name }}
+{% endif %}
 
 netbird_service:
   service.dead:

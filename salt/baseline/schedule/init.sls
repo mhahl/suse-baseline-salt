@@ -10,7 +10,8 @@
 {% set sync_cfg = sched.get('sync_modules', {}) %}
 
 {# System package names differ by family: Tumbleweed uses versioned
-   python3${minor}-* stacks; Fedora uses python3-* package names.
+   python3${minor}-* stacks; Fedora uses python3-* package names;
+   FreeBSD uses pyXY-* (e.g. py311-croniter).
    The system packages only cover minions running on the system Python.
    Onedir/venv/container minions ship an isolated interpreter that never
    sees system site-packages (upstream: "Missing python-croniter" despite
@@ -20,7 +21,13 @@
    once, or the scheduler keeps logging "Missing python-croniter.
    Ignoring job highstate-nightly" until then. #}
 {% set _family = grains.get('os_family', '') %}
-{% set _py = 'python3' ~ grains.get('pythonversion', [3, 13])[1] if _family == 'Suse' else 'python3' %}
+{% if _family == 'FreeBSD' %}
+{% set _py = 'py' ~ grains.get('pythonversion', [3, 11])[0] ~ grains.get('pythonversion', [3, 11])[1] %}
+{% elif _family == 'Suse' %}
+{% set _py = 'python3' ~ grains.get('pythonversion', [3, 13])[1] %}
+{% else %}
+{% set _py = 'python3' %}
+{% endif %}
 schedule_croniter_package:
   pkg.installed:
     - name: {{ _py }}-croniter
