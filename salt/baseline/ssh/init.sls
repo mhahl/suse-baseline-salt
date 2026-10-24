@@ -11,13 +11,30 @@
 # The sshd configuration is validated (sshd -t) before every reload,
 # and reload preserves active sessions (SIGHUP vs restart).
 {% set enabled = salt['pillar.get']('baseline:ssh:enabled', True) %}
-{# FreeBSD has no `root` group (it is `wheel`); content stays identical. #}
-{% set _group = 'wheel' if grains.get('os_family', '') == 'FreeBSD' else 'root' %}
+{% set _family = grains.get('os_family', '') %}
+{# FreeBSD has no `root` group (it is `wheel`), and its base sshd_config
+   ships no Include for sshd_config.d (Tumbleweed/Fedora do) — so on
+   FreeBSD the Include is added additively to /etc/ssh/sshd_config and
+   the drop-in dir is created (makedirs). Content stays identical. #}
+{% set _group = 'wheel' if _family == 'FreeBSD' else 'root' %}
 
 {% if enabled %}
+{% if _family == 'FreeBSD' %}
+sshd_config_include:
+  file.blockreplace:
+    - name: /etc/ssh/sshd_config
+    - marker_start: "# BEGIN baseline managed sshd include"
+    - marker_end: "# END baseline"
+    - content: 'Include /etc/ssh/sshd_config.d/*.conf'
+    - prepend_if_not_found: True
+    - user: root
+    - group: wheel
+    - mode: '0644'
+{% endif %}
 sshd_config_dropin:
   file.managed:
     - name: /etc/ssh/sshd_config.d/01-baseline-sshd.conf
+    - makedirs: True
     - contents: |
         # Managed by baseline.ssh — remove the drop-in or set
         # baseline:ssh:enabled: false in pillar to disable.
@@ -104,12 +121,19 @@ sshd_config_dropin:
     - user: root
     - group: {{ _group }}
     - mode: '0644'
+{% if _family == 'FreeBSD' %}
+    - require:
+      - file: sshd_config_include
+{% endif %}
 
 sshd_validate:
   cmd.run:
     - name: sshd -t
     - onchanges:
       - file: sshd_config_dropin
+{% if _family == 'FreeBSD' %}
+      - file: sshd_config_include
+{% endif %}
     - failhard: True
     - order: 1
 
@@ -119,6 +143,9 @@ sshd_reload:
     - m_name: sshd
     - onchanges:
       - file: sshd_config_dropin
+{% if _family == 'FreeBSD' %}
+      - file: sshd_config_include
+{% endif %}
     - require:
       - cmd: sshd_validate
 
@@ -126,8 +153,20 @@ sshd_service:
   service.running:
     - name: sshd
     - enable: True
+{% if _family == 'FreeBSD' %}
+    - require:
+      - file: sshd_config_include
+{% endif %}
 
 {% else %}
+{% if _family == 'FreeBSD' %}
+sshd_config_include:
+  file.blockreplace:
+    - name: /etc/ssh/sshd_config
+    - marker_start: "# BEGIN baseline managed sshd include"
+    - marker_end: "# END baseline"
+    - content: ""
+{% endif %}
 sshd_config_dropin:
   file.absent:
     - name: /etc/ssh/sshd_config.d/01-baseline-sshd.conf
@@ -138,4 +177,7 @@ sshd_reload:
     - m_name: sshd
     - onchanges:
       - file: sshd_config_dropin
+{% if _family == 'FreeBSD' %}
+      - file: sshd_config_include
+{% endif %}
 {% endif %}
