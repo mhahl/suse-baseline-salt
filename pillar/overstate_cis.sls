@@ -31,15 +31,31 @@ overstate_cis:
     firewalld: False              # baseline:firewalld manages zones/services (12-firewalld.sls)
     firewalld_default_zone: False
     firewall_strict_drop: False   # baseline owns default-zone; also L2-gated
-    sysctl_kernel: False          # baseline:sysctl owns /etc/sysctl.d/99-baseline.conf
     sshd: False                   # baseline:ssh owns sshd (FreeIPA key-only/GSSAPI auth)
     usb_storage: False            # baseline:usb blocks usb-storage + uas
+
+  # sysctl is owned solely by the formula now (sysctl_kernel control →
+  # /etc/sysctl.d/99-cis.conf). The formula's CIS base set is
+  # IPv4-network focused; carry over the kernel-memory + IPv6 hardening
+  # that baseline.sysctl used to provide so nothing silently regresses.
+  # network.sls merges this over its sysctl_base (extra keys win).
+  sysctl:
+    kernel.kptr_restrict: 2
+    kernel.dmesg_restrict: 1
+    kernel.randomize_va_space: 2
+    kernel.sysrq: 0
+    fs.suid_dumpable: 0
+    net.ipv6.conf.all.accept_redirects: 0
+    net.ipv6.conf.default.accept_redirects: 0
+    net.ipv6.conf.all.accept_source_route: 0
+    net.ipv6.conf.default.accept_source_route: 0
+    net.ipv6.conf.all.forwarding: 0
+    net.ipv6.conf.default.forwarding: 0
 
   # Optional overrides (formula defaults are sane; set only what you need):
   # sshd_options:
   #   PermitRootLogin: 'no'
   #   PasswordAuthentication: 'no'
-  # sysctl: {}
   # log_server: '@localhost'
   # lookup:
   #   selinux_runtime_managed: True   # hosts WITH libselinux-bindings (security:SELinux)
