@@ -11,6 +11,8 @@
 # The sshd configuration is validated (sshd -t) before every reload,
 # and reload preserves active sessions (SIGHUP vs restart).
 {% set enabled = salt['pillar.get']('baseline:ssh:enabled', True) %}
+{# FreeBSD has no `root` group (it is `wheel`); content stays identical. #}
+{% set _group = 'wheel' if grains.get('os_family', '') == 'FreeBSD' else 'root' %}
 
 {% if enabled %}
 sshd_config_dropin:
@@ -100,7 +102,7 @@ sshd_config_dropin:
         # added.
         MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
     - user: root
-    - group: root
+    - group: {{ _group }}
     - mode: '0644'
 
 sshd_validate:
