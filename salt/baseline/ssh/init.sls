@@ -27,9 +27,6 @@ sshd_config_include:
     - marker_end: "# END baseline"
     - content: 'Include /etc/ssh/sshd_config.d/*.conf'
     - prepend_if_not_found: True
-    - user: root
-    - group: wheel
-    - mode: '0644'
 {% endif %}
 sshd_config_dropin:
   file.managed:
