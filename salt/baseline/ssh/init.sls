@@ -50,7 +50,9 @@ sshd_config_dropin:
 
         # FreeIPA / SSSD integration: IPA-published SSH keys + Kerberos SSO
         GSSAPIAuthentication yes
+{% if _family != 'FreeBSD' %}
         GSSAPIKeyExchange yes
+{% endif %}
         GSSAPICleanupCredentials yes
         AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
         AuthorizedKeysCommandUser nobody
