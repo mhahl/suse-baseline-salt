@@ -25,6 +25,10 @@ minion_master_config:
           - {{ addr }}
 {% endfor %}
         master_type: failover
+        # Fail over to the next master on DNS errors instead of retrying
+        # the same (possibly poisoned) answer — Salt logs a CRITICAL and
+        # forces this to 0 under failover if it is left unset.
+        retry_dns: 0
     - user: root
     - group: {{ _group }}
     - mode: '0644'
