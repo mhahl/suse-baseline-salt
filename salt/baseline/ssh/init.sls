@@ -105,7 +105,15 @@ sshd_config_dropin:
         # openSUSE Tumbleweed and Fedora as of late 2024).
         # On OpenSSH >= 9.9 (Fedora 43+, Tumbleweed rolling),
         # prepend "mlkem768x25519-sha256," for IETF ML-KEM (FIPS 203).
+{% if _family == 'FreeBSD' %}
+        # FreeBSD 15 base ships OpenSSH 10, whose default KEX is the
+        # ML-KEM hybrid: list it first, then both names of the sntrup
+        # hybrid (some peers offer the canonical name), then classical
+        # Curve25519 as fallback for older clients. No ECDSA/DH groups.
+        KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org
+{% else %}
         KexAlgorithms sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org
+{% endif %}
 
         # Ciphers: AEAD only.  ChaCha20-Poly1305 preferred (no packet
         # length oracle); AES-GCM as a hardware-accelerated fallback
