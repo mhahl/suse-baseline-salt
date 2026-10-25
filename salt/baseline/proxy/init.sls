@@ -153,7 +153,7 @@ proxy_pkg_env_absent:
     - marker_start: "# BEGIN baseline managed pkg proxy"
     - marker_end: "# END baseline"
     - content: ""
-    - onlyif: test -f /usr/local/etc/pkg.conf
+    - onlyif: test -f /usr/local/etc/pkg.conf && grep -q 'BEGIN baseline managed pkg proxy' /usr/local/etc/pkg.conf
 {% endif %}
 {% endif %}
 {% endif %}

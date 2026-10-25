@@ -24,12 +24,26 @@ unbound_ca_bundle:
     - require:
       - pkg: unbound_package
 
+# The daemon drops privileges and works from this directory (anchor
+# refreshes rewrite root.key in place, so it must be unbound-writable).
+# Nothing in the port creates it — checkconf fatals without it.
+unbound_working_dir:
+  file.directory:
+    - name: /var/db/unbound
+    - user: unbound
+    - group: unbound
+    - mode: '0755'
+    - makedirs: True
+    - require:
+      - pkg: unbound_package
+
 unbound_root_key:
   cmd.run:
     - name: unbound-anchor -a /var/db/unbound/root.key
     - unless: test -f /var/db/unbound/root.key
     - require:
       - pkg: unbound_package
+      - file: unbound_working_dir
 
 unbound_config:
   file.managed:

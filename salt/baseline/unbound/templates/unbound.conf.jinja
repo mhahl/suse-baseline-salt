@@ -38,6 +38,11 @@ server:
     qname-minimisation: yes
 
     # Drop privileges and run from the package's working directory.
+    # No chroot: all paths above are absolute, and a chroot default
+    # would silently reinterpret them (checkconf resolves file paths
+    # against the chroot). Stated explicitly so a port default can
+    # never change the meaning of this file.
+    chroot: ""
     username: unbound
     directory: /var/db/unbound
     pidfile: /var/run/unbound.pid
