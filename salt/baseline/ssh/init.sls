@@ -17,6 +17,8 @@
    FreeBSD the Include is added additively to /etc/ssh/sshd_config and
    the drop-in dir is created (makedirs). Content stays identical. #}
 {% set _group = 'wheel' if _family == 'FreeBSD' else 'root' %}
+{# sssd installs to /usr/local on FreeBSD (ports); /usr/bin is base-only there. #}
+{% set _sss_authorizedkeys = '/usr/local/bin/sss_ssh_authorizedkeys' if _family == 'FreeBSD' else '/usr/bin/sss_ssh_authorizedkeys' %}
 
 {% if enabled %}
 {% if _family == 'FreeBSD' %}
@@ -54,7 +56,7 @@ sshd_config_dropin:
         GSSAPIKeyExchange yes
 {% endif %}
         GSSAPICleanupCredentials yes
-        AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+        AuthorizedKeysCommand {{ _sss_authorizedkeys }}
         AuthorizedKeysCommandUser nobody
 
         # Sufficient: a user needs a public key OR a valid GSSAPI
